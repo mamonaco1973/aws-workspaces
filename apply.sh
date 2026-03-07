@@ -1,61 +1,58 @@
 #!/bin/bash
-# ==============================================================================
-# File: apply.sh
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Deploy the full stack in two phases:
-#     1) AWS Managed Microsoft AD (Directory Service)
-#     2) EC2 servers that depend on the directory
-#
-# Notes:
-#   - Script fails immediately on any error.
-#   - AWS_DEFAULT_REGION must be set for AWS CLI and Terraform.
-#   - Execution order matters (servers depend on directory).
-# ==============================================================================
 
-set -euo pipefail
+# -------------------------
+# Step 0: Set AWS region
+# -------------------------
 
-# ------------------------------------------------------------------------------
-# Global configuration
-# ------------------------------------------------------------------------------
+export AWS_DEFAULT_REGION=us-east-1  # Required so AWS CLI/Terraform know where to operate
 
-export AWS_DEFAULT_REGION="us-east-2"
+# --------------------------------------
+# Step 1: Run preflight environment check
+# --------------------------------------
+./check_env.sh  # This should validate CLI setup, credentials, and required binaries
+if [ $? -ne 0 ]; then
+  echo "ERROR: Environment check failed. Exiting."
+  exit 1  # 🚨 Abort if check_env.sh fails — nothing should run without a valid env
+fi
+set -e
 
-# ------------------------------------------------------------------------------
-# Pre-flight environment validation
-# ------------------------------------------------------------------------------
+# -------------------------------------
+# Step 2: Build Phase 1 - AD Deployment
+# -------------------------------------
+cd 01-directory  # Enter the Terraform directory for AD setup
 
-./check_env.sh
+terraform init  # Initialize Terraform — installs providers, sets up backend
+terraform apply -auto-approve  # 🚀 Launch AD resources (Managed Microsoft AD or Simple AD)
 
-# ------------------------------------------------------------------------------
-# Phase 1: Directory Service
-# ------------------------------------------------------------------------------
+cd ..  # Go back to root directory
 
-echo "NOTE: Deploying Directory Service..."
+# -------------------------------------------------
+# Step 3: Get the Directory ID for mcloud.mikecloud.com
+# -------------------------------------------------
+directory_id=$(aws ds describe-directories \
+  --region us-east-1 \
+  --query "DirectoryDescriptions[?Name=='mcloud.mikecloud.com'].DirectoryId" \
+  --output text)  # 🔍 Extract the directory_id dynamically for use in next Terraform phase
 
-cd 01-directory
+# ------------------------------------------
+# Step 4: Build Phase 2 - EC2 Server Launch
+# ------------------------------------------
+cd 02-servers  # Enter the Terraform folder for EC2 instances
 
-terraform init
-terraform apply -auto-approve
+terraform init  # Re-initialize in this directory
+terraform apply -var="directory_id=$directory_id"  -auto-approve  # ⚙️ Pass directory ID into the EC2 provisioning module
 
-cd ..
+cd ..  # Return to root
 
-# ------------------------------------------------------------------------------
-# Phase 2: EC2 Servers
-# ------------------------------------------------------------------------------
+# -------------------------
+# Step 5: Run Branding Script
+# -------------------------
+echo "NOTE: Branding the Workspaces."
+./brand.sh  # 🖼️ Apply custom branding (logos, etc.) to WorkSpaces client portals
 
-echo "NOTE: Deploying Test EC2 instances..."
-
-cd 02-servers
-
-terraform init
-terraform apply -auto-approve
-
-cd ..
-
-# ------------------------------------------------------------------------------
-# Call Validation
-# ------------------------------------------------------------------------------
+# --------------------------------------------
+# Step 6: Run validate script
+# --------------------------------------------
 
 ./validate.sh
 

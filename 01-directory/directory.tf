@@ -1,78 +1,42 @@
-# ==============================================================================
-# File: directory.tf
-# ------------------------------------------------------------------------------
-# Purpose:
-#   - Deploys an AWS Managed Microsoft Active Directory instance.
-#   - Configures VPC-level DNS settings required for domain operation.
-#
-# Scope:
-#   - Creates Microsoft AD directory (Standard edition).
-#   - Associates directory with dedicated VPC and subnets.
-#   - Configures VPC DHCP options to use AD-provided DNS servers.
-#
-# Notes:
-#   - Directory admin password is sourced from random_password resource.
-#   - Two subnets are required for high availability.
-#   - DHCP options must reference directory DNS IP addresses.
-#   - Domain name and NetBIOS name are variable-driven.
-# ==============================================================================
-
-
-# ==============================================================================
-# AWS MANAGED MICROSOFT ACTIVE DIRECTORY
-# ==============================================================================
-
-# ------------------------------------------------------------------------------
-# Create AWS Managed Microsoft AD directory
-# ------------------------------------------------------------------------------
-
+# Create an AWS Managed Microsoft Active Directory (AD) instance
 resource "aws_directory_service_directory" "ad_directory" {
-  name        = var.ad_domain_name
-  password    = random_password.admin_password.result
-  edition     = "Standard"
-  type        = "MicrosoftAD"
-  short_name  = var.netbios
-  description = "Managed Microsoft AD for lab and quick-start environments"
+  name        = "mcloud.mikecloud.com"     # Fully Qualified Domain Name (FQDN) of the AD directory. Change this to your desired AD domain name.
+  password    = random_password.admin_password.result  
+                                           # Admin password for the directory, sourced from a secure random password resource.
+  edition     = "Standard"                 # Choose the AD edition. Options: "Standard" (supports up to 5,000 users) or "Enterprise" (supports up to 100,000 users).
+  type        = "MicrosoftAD"              # Specifies that this is a Microsoft Active Directory deployment.
+  short_name  = "MCLOUD"                   # Shortened NetBIOS name of the domain.
+  description = "mikecloud.com example for youtube channel"  
+                                           # Descriptive metadata for the AD instance.
 
-  # ---------------------------------------------------------------------------
-  # VPC configuration for directory deployment
-  # ---------------------------------------------------------------------------
-
+  # Define the Virtual Private Cloud (VPC) configuration for the AD directory
   vpc_settings {
-    vpc_id = aws_vpc.ad-vpc.id
-
+    vpc_id     = aws_vpc.ad-vpc.id   # Associates the directory with a specific VPC.
     subnet_ids = [
-      aws_subnet.ad-subnet-1.id,
-      aws_subnet.ad-subnet-2.id
+      aws_subnet.ad-private-subnet-1.id,  # ID of the first subnet where the AD instance will be deployed.
+      aws_subnet.ad-private-subnet-2.id   # ID of the second subnet to ensure high availability.
     ]
   }
 
-  depends_on = [ aws_nat_gateway.ad_nat ]
-}
-
-
-# ==============================================================================
-# VPC DHCP OPTIONS (AD DNS CONFIGURATION)
-# ==============================================================================
-
-# ------------------------------------------------------------------------------
-# Create DHCP options set using AD-provided DNS servers
-# ------------------------------------------------------------------------------
-
-resource "aws_vpc_dhcp_options" "ad_dhcp_options" {
-  domain_name         = var.ad_domain_name
-  domain_name_servers = aws_directory_service_directory.ad_directory.dns_ip_addresses
+  # Assign a tag to the AD directory for easier identification and resource management.
   tags = {
-    Name = "${lower(var.netbios)}-dhcp-options"
+    Name = "mikecloud"  # Custom tag for easier identification in AWS Management Console and CLI.
   }
 }
 
+# Create a DHCP Options Set for the VPC to configure DNS settings for Active Directory
+resource "aws_vpc_dhcp_options" "ad_dhcp_options" {
+  domain_name         = "mikecloud.com"  # Specifies the domain name clients will use for DNS resolution within the VPC.
+  domain_name_servers = aws_directory_service_directory.ad_directory.dns_ip_addresses  # Uses AD-provided DNS servers for domain name resolution.
 
-# ------------------------------------------------------------------------------
-# Associate DHCP options set with AD VPC
-# ------------------------------------------------------------------------------
+  # Assign a tag to the DHCP options set for easier identification.
+  tags = {
+    Name = "ad-dhcp-options"  # Tag to identify this DHCP options set.
+  }
+}
 
+# Associate the DHCP Options Set with the VPC to enforce Active Directory-specific DNS settings
 resource "aws_vpc_dhcp_options_association" "ad_dhcp_association" {
-  vpc_id          = aws_vpc.ad-vpc.id
-  dhcp_options_id = aws_vpc_dhcp_options.ad_dhcp_options.id
+  vpc_id          = aws_vpc.ad-vpc.id                         # VPC where the DHCP options set will be applied.
+  dhcp_options_id = aws_vpc_dhcp_options.ad_dhcp_options.id   # The DHCP options set being associated with the VPC.
 }

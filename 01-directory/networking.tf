@@ -1,179 +1,160 @@
-# ==============================================================================
-# File: networking.tf
-# ------------------------------------------------------------------------------
-# Purpose:
-#   - Builds a lab VPC baseline for AWS Managed Microsoft Active Directory.
-#
-# Scope:
-#   - One VPC with:
-#       - Two public "vm" subnets for utility/bastion workloads.
-#       - Two private "ad" subnets for AWS Directory Service placement.
-#   - Internet egress:
-#       - Public subnets route to an Internet Gateway (IGW).
-#       - Private subnets route to a NAT Gateway for outbound-only access.
-#
-# Notes:
-#   - AWS Managed Microsoft AD requires two subnets in different AZs.
-#   - NAT Gateway requires an Elastic IP and must be placed in a public subnet.
-#   - CIDRs and AZs are example values. Align these to your IP plan and
-#     region/AZ strategy.
-#   - This configuration is intentionally explicit (non-dynamic) for clarity in
-#     instructional and demo environments.
-# ==============================================================================
-
-
-# ==============================================================================
-# VPC
-# ==============================================================================
-
+# --------------------
+# VPC Definition Block
+# --------------------
 resource "aws_vpc" "ad-vpc" {
+  # Defines the CIDR range for the VPC (256 IPs total)
   cidr_block           = "10.0.0.0/24"
+  # Enables internal DNS resolution within the VPC
   enable_dns_support   = true
+  # Allows assigning DNS hostnames to EC2 instances
   enable_dns_hostnames = true
 
-  tags = { Name = var.vpc_name }
+  tags = {
+    Name = "ad-vpc"  # Human-readable name for this VPC
+  }
 }
 
-
-# ==============================================================================
-# Internet Gateway
-# - Provides internet egress for public subnets via default route (0.0.0.0/0).
-# ==============================================================================
-
+# ----------------------------
+# Internet Gateway Definition
+# ----------------------------
 resource "aws_internet_gateway" "ad-igw" {
+  # Attach the IGW to the previously defined VPC
   vpc_id = aws_vpc.ad-vpc.id
 
-  tags = { Name = "ad-igw" }
+  tags = {
+    Name = "ad-igw"  # Tag for easy identification
+  }
 }
 
-
-# ==============================================================================
-# Subnets
-# ------------------------------------------------------------------------------
-# Public Subnets:
-#   - vm-subnet-1: Utility/bastion workloads with public IPv4.
-#   - vm-subnet-2: Additional utility capacity / HA option.
-#
-# Private Subnets:
-#   - ad-subnet-1: AWS Directory Service placement subnet (AZ1).
-#   - ad-subnet-2: AWS Directory Service placement subnet (AZ2).
-# ==============================================================================
-
-resource "aws_subnet" "vm-subnet-1" {
-  vpc_id                  = aws_vpc.ad-vpc.id
-  cidr_block              = "10.0.0.64/26"
-  map_public_ip_on_launch = true
-  availability_zone       = "us-east-2a"
-
-  tags = { Name = "vm-subnet-1" }
-}
-
-resource "aws_subnet" "vm-subnet-2" {
-  vpc_id                  = aws_vpc.ad-vpc.id
-  cidr_block              = "10.0.0.128/26"
-  map_public_ip_on_launch = true
-  availability_zone       = "us-east-2b"
-
-  tags = { Name = "vm-subnet-2" }
-}
-
-resource "aws_subnet" "ad-subnet-1" {
-  vpc_id                  = aws_vpc.ad-vpc.id
-  cidr_block              = "10.0.0.0/26"
-  map_public_ip_on_launch = false
-  availability_zone       = "us-east-2a"
-
-  tags = { Name = "ad-subnet-1" }
-}
-
-resource "aws_subnet" "ad-subnet-2" {
-  vpc_id                  = aws_vpc.ad-vpc.id
-  cidr_block              = "10.0.0.192/26"
-  map_public_ip_on_launch = false
-  availability_zone       = "us-east-2b"
-
-  tags = { Name = "ad-subnet-2" }
-}
-
-
-# ==============================================================================
-# NAT Egress
-# ------------------------------------------------------------------------------
-# Purpose:
-#   - Provides outbound internet access for instances in private subnets.
-#
-# Notes:
-#   - The NAT Gateway must be deployed into a public subnet.
-#   - The Elastic IP provides a stable public egress address.
-# ==============================================================================
-
+# --------------------------------
+# Elastic IP for the NAT Gateway
+# --------------------------------
 resource "aws_eip" "nat_eip" {
-  tags = { Name = "nat-eip" }
+  # Allocate the EIP to the VPC domain (not EC2-Classic)
+  domain = "vpc"
+
+  tags = {
+    Name = "ad-nat-eip"  # Tag for EIP identification
+  }
 }
 
-resource "aws_nat_gateway" "ad_nat" {
-  subnet_id     = aws_subnet.vm-subnet-1.id
+# ----------------------------------------
+# NAT Gateway for Private Subnet Egress
+# ----------------------------------------
+resource "aws_nat_gateway" "ad-nat-gw" {
+  # Use the EIP for external internet access
   allocation_id = aws_eip.nat_eip.id
+  # NAT Gateway must be deployed in a public subnet (see nat-subnet)
+  subnet_id     = aws_subnet.nat-subnet.id
 
-  tags = { Name = "ad-nat" }
+  tags = {
+    Name = "ad-nat-gateway"
+  }
 }
 
-
-# ==============================================================================
-# Route Tables
-# ------------------------------------------------------------------------------
-# Public:
-#   - Default route to IGW for public subnet internet access.
-#
-# Private:
-#   - Default route to NAT for private subnet outbound-only internet access.
-# ==============================================================================
-
+# ------------------------------
+# Public Route Table Definition
+# ------------------------------
 resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.ad-vpc.id
+  vpc_id = aws_vpc.ad-vpc.id  # Associate with main VPC
 
-  tags = { Name = "public-route-table" }
+  tags = {
+    Name = "public-route-table"
+  }
 }
 
-resource "aws_route" "public_default" {
+# -----------------------------------------------
+# Route in Public Route Table to Internet Gateway
+# -----------------------------------------------
+resource "aws_route" "public_default_route" {
+  # Routes all outbound traffic (0.0.0.0/0) to the IGW
   route_table_id         = aws_route_table.public.id
   destination_cidr_block = "0.0.0.0/0"
   gateway_id             = aws_internet_gateway.ad-igw.id
 }
 
+# -------------------------------
+# Private Route Table Definition
+# -------------------------------
 resource "aws_route_table" "private" {
-  vpc_id = aws_vpc.ad-vpc.id
+  vpc_id = aws_vpc.ad-vpc.id  # Associate with main VPC
 
-  tags = { Name = "private-route-table" }
+  tags = {
+    Name = "private-route-table"
+  }
 }
 
-resource "aws_route" "private_default" {
+# ----------------------------------------------------
+# Route in Private Route Table to NAT for Egress Only
+# ----------------------------------------------------
+resource "aws_route" "private_default_route" {
+  # Private subnets route traffic to the NAT Gateway for outbound internet
   route_table_id         = aws_route_table.private.id
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.ad_nat.id
+  nat_gateway_id         = aws_nat_gateway.ad-nat-gw.id
 }
 
+# -------------------------------
+# NAT Subnet (a.k.a. Public Subnet)
+# -------------------------------
+resource "aws_subnet" "nat-subnet" {
+  vpc_id                  = aws_vpc.ad-vpc.id
+  cidr_block              = "10.0.0.0/26"  # First 64 IPs of the VPC CIDR
+  # Disables auto-assignment of public IPs (assumes NAT GW will be manually exposed)
+  map_public_ip_on_launch = false
+  availability_zone_id    = "use1-az1"  # Specific AZ
 
-# ==============================================================================
-# Route Table Associations
-# ==============================================================================
+  tags = {
+    Name = "nat-subnet"
+  }
+}
 
-resource "aws_route_table_association" "rt_assoc_vm_public_1" {
-  subnet_id      = aws_subnet.vm-subnet-1.id
+# -----------------------------------
+# Private Subnet 1 (for internal use)
+# -----------------------------------
+resource "aws_subnet" "ad-private-subnet-1" {
+  vpc_id               = aws_vpc.ad-vpc.id
+  cidr_block           = "10.0.0.128/26"  # 10.0.0.128 - 10.0.0.191
+  availability_zone_id = "use1-az6"
+
+  tags = {
+    Name = "ad-private-subnet-1"
+  }
+}
+
+# -----------------------------------
+# Private Subnet 2 (for internal use)
+# -----------------------------------
+resource "aws_subnet" "ad-private-subnet-2" {
+  vpc_id               = aws_vpc.ad-vpc.id
+  cidr_block           = "10.0.0.192/26"  # 10.0.0.192 - 10.0.0.255
+  availability_zone_id = "use1-az4"
+
+  tags = {
+    Name = "ad-private-subnet-2"
+  }
+}
+
+# ---------------------------------------
+# Associate NAT Subnet to Public Route Table
+# ---------------------------------------
+resource "aws_route_table_association" "public_rta_1" {
+  subnet_id      = aws_subnet.nat-subnet.id
   route_table_id = aws_route_table.public.id
 }
 
-resource "aws_route_table_association" "rt_assoc_vm_public_2" {
-  subnet_id      = aws_subnet.vm-subnet-2.id
-  route_table_id = aws_route_table.public.id
-}
-
-resource "aws_route_table_association" "rt_assoc_ad_private_1" {
-  subnet_id      = aws_subnet.ad-subnet-1.id
+# -------------------------------------------------
+# Associate Private Subnet 1 to Private Route Table
+# -------------------------------------------------
+resource "aws_route_table_association" "private_rta_1" {
+  subnet_id      = aws_subnet.ad-private-subnet-1.id
   route_table_id = aws_route_table.private.id
 }
 
-resource "aws_route_table_association" "rt_assoc_ad_private_2" {
-  subnet_id      = aws_subnet.ad-subnet-2.id
+# -------------------------------------------------
+# Associate Private Subnet 2 to Private Route Table
+# -------------------------------------------------
+resource "aws_route_table_association" "private_rta_2" {
+  subnet_id      = aws_subnet.ad-private-subnet-2.id
   route_table_id = aws_route_table.private.id
 }
