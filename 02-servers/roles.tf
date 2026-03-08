@@ -21,7 +21,7 @@ locals {
 
 # ================================================================================
 # EC2 Secrets Manager Access Role
-# --------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------a
 # Role assumed by EC2 instances that require access to AWS Secrets Manager.
 # ================================================================================
 
@@ -39,29 +39,6 @@ resource "aws_iam_role" "ec2_secrets_role" {
     }]
   })
 }
-
-
-# ================================================================================
-# EC2 Systems Manager Role
-# --------------------------------------------------------------------------------
-# Role allowing EC2 instances to interact with AWS Systems Manager.
-# ================================================================================
-
-resource "aws_iam_role" "ec2_ssm_role" {
-  name = "tf-ec2-ssm-role-${local.build_suffix}"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Principal = {
-        Service = "ec2.amazonaws.com"
-      }
-      Action = "sts:AssumeRole"
-    }]
-  })
-}
-
 
 # ================================================================================
 # Secrets Manager Access Policy
@@ -125,7 +102,28 @@ resource "aws_iam_instance_profile" "ec2_secrets_profile" {
   role = aws_iam_role.ec2_secrets_role.name
 }
 
-resource "aws_iam_instance_profile" "ec2_ssm_profile" {
-  name = "tf-ec2-ssm-profile-${local.build_suffix}"
-  role = aws_iam_role.ec2_ssm_role.name
+# ================================================================================
+# Attach Secrets Manager Policy To EC2 Role
+# --------------------------------------------------------------------------------
+# Attaches the custom Secrets Manager read policy to the EC2 role.
+# ================================================================================
+
+resource "aws_iam_role_policy_attachment" "ec2_secrets_policy_attach" {
+  role       = aws_iam_role.ec2_secrets_role.name
+  policy_arn = aws_iam_policy.secrets_policy.arn
+}
+
+# ================================================================================
+# Attach AWS Systems Manager Policy
+# --------------------------------------------------------------------------------
+# Allows the EC2 instance to register with AWS Systems Manager (SSM) so it can
+# be managed using Session Manager, Run Command, and Patch Manager.
+#
+# Policy
+# - AmazonSSMManagedInstanceCore
+# ================================================================================
+
+resource "aws_iam_role_policy_attachment" "ec2_ssm_attach" {
+  role       = aws_iam_role.ec2_secrets_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
