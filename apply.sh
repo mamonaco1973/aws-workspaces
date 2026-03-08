@@ -1,59 +1,120 @@
 #!/bin/bash
 
-# -------------------------
-# Step 0: Set AWS region
-# -------------------------
+# ================================================================================
+# Workspace Apply Script
+# --------------------------------------------------------------------------------
+# Orchestrates the full deployment workflow for the Active Directory workspace
+# environment.
+#
+# Workflow
+# - Validate environment and required tooling
+# - Deploy Active Directory infrastructure
+# - Retrieve directory ID
+# - Deploy EC2 infrastructure joined to the directory
+# - Apply optional branding
+# - Run deployment validation
+# ================================================================================
 
-export AWS_DEFAULT_REGION=us-east-1  # Required so AWS CLI/Terraform know where to operate
 
-# --------------------------------------
-# Step 1: Run preflight environment check
-# --------------------------------------
-./check_env.sh  # This should validate CLI setup, credentials, and required binaries
+# ================================================================================
+# Step 0: Set AWS Region
+# --------------------------------------------------------------------------------
+# Sets the default AWS region for all AWS CLI and Terraform operations.
+# ================================================================================
+
+export AWS_DEFAULT_REGION=us-east-1
+
+
+# ================================================================================
+# Step 1: Run Environment Preflight Check
+# --------------------------------------------------------------------------------
+# Validates that required tools and credentials are configured correctly.
+#
+# Notes
+# - check_env.sh should verify AWS CLI, Terraform, and required binaries.
+# - Script exits immediately if validation fails.
+# ================================================================================
+
+./check_env.sh
+
 if [ $? -ne 0 ]; then
   echo "ERROR: Environment check failed. Exiting."
-  exit 1  # 🚨 Abort if check_env.sh fails — nothing should run without a valid env
+  exit 1
 fi
-set -e
 
-# -------------------------------------
-# Step 2: Build Phase 1 - AD Deployment
-# -------------------------------------
-cd 01-directory  # Enter the Terraform directory for AD setup
+set -e  # Exit immediately if any command fails
 
-terraform init  # Initialize Terraform — installs providers, sets up backend
-terraform apply -auto-approve  # 🚀 Launch AD resources (Managed Microsoft AD or Simple AD)
 
-cd ..  # Go back to root directory
+# ================================================================================
+# Step 2: Deploy Active Directory Infrastructure
+# --------------------------------------------------------------------------------
+# Deploys the directory services infrastructure using Terraform.
+#
+# Components
+# - AWS Managed Microsoft Active Directory
+# - VPC networking resources
+# - Supporting infrastructure
+# ================================================================================
 
-# -------------------------------------------------
-# Step 3: Get the Directory ID for mcloud.mikecloud.com
-# -------------------------------------------------
+cd 01-directory
+
+terraform init
+terraform apply -auto-approve
+
+cd ..
+
+exit 0
+
+# ================================================================================
+# Step 3: Discover Directory ID
+# --------------------------------------------------------------------------------
+# Retrieves the directory ID for the deployed Active Directory instance.
+#
+# Notes
+# - This ID is required by the EC2 provisioning phase.
+# - Retrieved dynamically using the AWS CLI.
+# ================================================================================
+
 directory_id=$(aws ds describe-directories \
   --region us-east-1 \
   --query "DirectoryDescriptions[?Name=='mcloud.mikecloud.com'].DirectoryId" \
-  --output text)  # 🔍 Extract the directory_id dynamically for use in next Terraform phase
+  --output text)
 
-# ------------------------------------------
-# Step 4: Build Phase 2 - EC2 Server Launch
-# ------------------------------------------
-cd 02-servers  # Enter the Terraform folder for EC2 instances
 
-terraform init  # Re-initialize in this directory
-terraform apply -var="directory_id=$directory_id"  -auto-approve  # ⚙️ Pass directory ID into the EC2 provisioning module
+# ================================================================================
+# Step 4: Deploy EC2 Infrastructure
+# --------------------------------------------------------------------------------
+# Launches EC2 servers and joins them to the deployed Active Directory.
+#
+# Inputs
+# - directory_id obtained from the previous step.
+# ================================================================================
 
-cd ..  # Return to root
+cd 02-servers
 
-# -------------------------
-# Step 5: Run Branding Script
-# -------------------------
+terraform init
+terraform apply -var="directory_id=$directory_id" -auto-approve
+
+cd ..
+
+
+# ================================================================================
+# Step 5: Apply Workspace Branding
+# --------------------------------------------------------------------------------
+# Runs optional branding customization for the workspace environment.
+#
+# Notes
+# - Typically used to customize logos or portal appearance.
+# ================================================================================
+
 echo "NOTE: Branding the Workspaces."
-./brand.sh  # 🖼️ Apply custom branding (logos, etc.) to WorkSpaces client portals
+./brand.sh
 
-# --------------------------------------------
-# Step 6: Run validate script
-# --------------------------------------------
+
+# ================================================================================
+# Step 6: Validate Deployment
+# --------------------------------------------------------------------------------
+# Runs the validation script to confirm that the environment deployed correctly.
+# ================================================================================
 
 ./validate.sh
-
-
