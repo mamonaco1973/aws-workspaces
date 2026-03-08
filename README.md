@@ -51,9 +51,8 @@ If this is your first time watching our content, we recommend starting with this
 ## Download this Repository
 
 ```bash
-git clone https://github.com/mamonaco1973/aws-active-directory.git aws-workspaces
+git clone https://github.com/mamonaco1973/aws-workspaces
 cd aws-workspaces
-git switch workspaces
 ```
 
 ## Build the Code
