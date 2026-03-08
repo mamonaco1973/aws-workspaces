@@ -65,22 +65,19 @@ else
   echo "WARN: WorkSpaces registration code not found"
 fi
 
-echo "NOTE: WorkSpaces Web Client: https://us-east-1.webclient.amazonworkspaces.com/login"
+echo "NOTE: WorkSpaces URL: https://us-east-1.webclient.amazonworkspaces.com/login"
 
 echo ""
 
 if [ -n "${windows_dns_name}" ] && [ "${windows_dns_name}" != "None" ]; then
-  echo "NOTE: Windows AD Server: ${windows_dns_name}"
+  echo "NOTE: Windows instance: ${windows_dns_name}"
 else
-  echo "WARN: Windows AD instance not found or not running"
+  echo "WARN: Windows instance not found or not running"
 fi
 
 if [ -n "${linux_dns_name}" ] && [ "${linux_dns_name}" != "None" ]; then
-  echo "NOTE: Linux AD Server:   ${linux_dns_name}"
+  echo "NOTE: Linux instance:   ${linux_dns_name}"
 else
-  echo "WARN: Linux AD instance not found or not running"
+  echo "WARN: Linux instance not found or not running"
 fi
 
-echo ""
-echo "NOTE: Validation complete."
-echo ""
