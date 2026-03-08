@@ -14,21 +14,6 @@ data "aws_directory_service_directory" "mcloud" {
 }
 
 # ================================================================================
-# Unique Deployment Identifier
-# --------------------------------------------------------------------------------
-# Generates a unique identifier used to prevent naming collisions across
-# multiple Terraform deployments.
-# ================================================================================
-
-resource "random_id" "build_id" {
-  byte_length = 3
-}
-
-locals {
-  build_suffix = random_id.build_id.hex
-}
-
-# ================================================================================
 # IAM Role for WorkSpaces Service
 # --------------------------------------------------------------------------------
 # Creates the IAM role required by AWS WorkSpaces. A unique suffix is appended
