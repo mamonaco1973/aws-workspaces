@@ -60,22 +60,24 @@ echo "==========================================================================
 echo ""
 
 if [ -n "${regcode}" ] && [ "${regcode}" != "None" ]; then
-  echo "NOTE: WorkSpaces Registration Code: ${regcode}"
-end
+  printf "NOTE: %-28s %s\n" "WorkSpaces Registration Code:" "${regcode}"
+fi
 
-echo "NOTE: WorkSpaces URL: https://us-east-1.webclient.amazonworkspaces.com/login"
+printf "NOTE: %-28s %s\n" "WorkSpaces URL:" "https://us-east-1.webclient.amazonworkspaces.com/login"
 
 echo ""
 
 if [ -n "${windows_dns_name}" ] && [ "${windows_dns_name}" != "None" ]; then
-  echo "NOTE: Windows instance: ${windows_dns_name}"
+  printf "NOTE: %-28s %s\n" "Windows instance:" "${windows_dns_name}"
 else
-  echo "WARN: Windows instance not found or not running"
+  printf "WARN: %-28s %s\n" "Windows instance:" "not found or not running"
 fi
 
 if [ -n "${linux_dns_name}" ] && [ "${linux_dns_name}" != "None" ]; then
-  echo "NOTE: Linux instance:   ${linux_dns_name}"
+  printf "NOTE: %-28s %s\n" "Linux instance:" "${linux_dns_name}"
 else
-  echo "WARN: Linux instance not found or not running"
+  printf "WARN: %-28s %s\n" "Linux instance:" "not found or not running"
 fi
+
+echo ""
 
