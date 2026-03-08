@@ -1,75 +1,129 @@
-# WARNING: This configuration allows unrestricted access from the internet (0.0.0.0/0)
-# It is highly insecure and should be restricted to trusted IPs.
-# Consider limiting access to known CIDR ranges instead.
+# ================================================================================
+# Unique Security Group Identifier
+# --------------------------------------------------------------------------------
+# Generates a unique suffix used for security group names. This prevents naming
+# collisions across multiple Terraform deployments.
+# ================================================================================
 
-# Security Group for RDP (Port 3389) - Used for Remote Desktop Protocol access to Windows instances
+resource "random_id" "sg_id" {
+  byte_length = 3
+}
+
+locals {
+  sg_suffix = random_id.sg_id.hex
+}
+
+
+# ================================================================================
+# RDP Security Group
+# --------------------------------------------------------------------------------
+# Allows Remote Desktop Protocol access to Windows instances.
+#
+# WARNING
+# - This configuration allows unrestricted internet access (0.0.0.0/0).
+# - This is NOT recommended for production environments.
+# - Restrict access to trusted CIDR ranges when possible.
+# ================================================================================
+
 resource "aws_security_group" "ad_rdp_sg" {
-  name        = "ad-rdp-security-group"               # Security Group name
-  description = "Allow RDP access from the internet"  # Description of the security group
-  vpc_id      = data.aws_vpc.ad_vpc.id                # Associates the security group with the specified VPC
+  name        = "ad-rdp-sg-${local.sg_suffix}"
+  description = "allow rdp access from the internet"
+  vpc_id      = data.aws_vpc.ad_vpc.id
 
-  # INGRESS: Defines inbound rules allowing access to port 3389 (RDP)
+  # ------------------------------------------------------------------------------
+  # Inbound RDP access
+  # ------------------------------------------------------------------------------
   ingress {
-    description = "Allow RDP from anywhere"           # This rule permits RDP access from all IPs
-    from_port   = 3389                                # Start of port range (RDP default port)
-    to_port     = 3389                                # End of port range (same as start for a single port)
-    protocol    = "tcp"                               # Protocol type (TCP for RDP)
-    cidr_blocks = ["0.0.0.0/0"]                       # WARNING: Allows traffic from ANY IP address (highly insecure!)
+    description = "allow rdp from anywhere"
+    from_port   = 3389
+    to_port     = 3389
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # EGRESS: Allows all outbound traffic (default open rule)
+  # ------------------------------------------------------------------------------
+  # Allow all outbound traffic
+  # ------------------------------------------------------------------------------
   egress {
-    from_port   = 0                                   # Start of port range (0 means all ports)
-    to_port     = 0                                   # End of port range (0 means all ports)
-    protocol    = "-1"                                # Protocol (-1 means all protocols)
-    cidr_blocks = ["0.0.0.0/0"]                       # Allows outbound traffic to ANY destination
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
-# Security Group for SSH (Port 22) - Used for Secure Shell access to Linux instances
+
+# ================================================================================
+# SSH Security Group
+# --------------------------------------------------------------------------------
+# Allows SSH access to Linux instances.
+#
+# WARNING
+# - This rule allows access from anywhere on the internet.
+# - Restrict to trusted IP ranges for production environments.
+# ================================================================================
+
 resource "aws_security_group" "ad_ssh_sg" {
-  name        = "ad-ssh-security-group"               # Security Group name
-  description = "Allow SSH access from the internet"  # Description of the security group
-  vpc_id      = data.aws_vpc.ad_vpc.id                # Associates the security group with the specified VPC
+  name        = "ad-ssh-sg-${local.sg_suffix}"
+  description = "allow ssh access from the internet"
+  vpc_id      = data.aws_vpc.ad_vpc.id
 
-  # INGRESS: Defines inbound rules allowing access to port 22 (SSH)
+  # ------------------------------------------------------------------------------
+  # Inbound SSH access
+  # ------------------------------------------------------------------------------
   ingress {
-    description = "Allow SSH from anywhere"           # This rule permits SSH access from all IPs
-    from_port   = 22                                  # Start of port range (SSH default port)
-    to_port     = 22                                  # End of port range (same as start for a single port)
-    protocol    = "tcp"                               # Protocol type (TCP for SSH)
-    cidr_blocks = ["0.0.0.0/0"]                       # WARNING: Allows traffic from ANY IP address (highly insecure!)
+    description = "allow ssh from anywhere"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # EGRESS: Allows all outbound traffic (default open rule)
+  # ------------------------------------------------------------------------------
+  # Allow all outbound traffic
+  # ------------------------------------------------------------------------------
   egress {
-    from_port   = 0                                   # Start of port range (0 means all ports)
-    to_port     = 0                                   # End of port range (0 means all ports)
-    protocol    = "-1"                                # Protocol (-1 means all protocols)
-    cidr_blocks = ["0.0.0.0/0"]                       # Allows outbound traffic to ANY destination
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
-# Security Group for SSM (Port 443) - Used for AWS Systems Manager (SSM) agent communication
-resource "aws_security_group" "ad_ssm_sg" {
-  name        = "ad-ssm-security-group"               # Security Group name
-  description = "Allow SSM access from the internet"  # Description of the security group
-  vpc_id      = data.aws_vpc.ad_vpc.id                # Associates the security group with the specified VPC
 
-  # INGRESS: Defines inbound rules allowing access to port 443 (HTTPS for SSM communication)
+# ================================================================================
+# Systems Manager Security Group
+# --------------------------------------------------------------------------------
+# Allows HTTPS communication required for AWS Systems Manager (SSM).
+#
+# Notes
+# - SSM agents communicate over HTTPS (port 443).
+# - Typically outbound-only communication is required.
+# ================================================================================
+
+resource "aws_security_group" "ad_ssm_sg" {
+  name        = "ad-ssm-sg-${local.sg_suffix}"
+  description = "allow ssm https communication"
+  vpc_id      = data.aws_vpc.ad_vpc.id
+
+  # ------------------------------------------------------------------------------
+  # Inbound HTTPS access
+  # ------------------------------------------------------------------------------
   ingress {
-    description = "Allow SSM from anywhere"           # This rule permits SSM agent communication from all IPs
-    from_port   = 443                                 # Start of port range (HTTPS default port)
-    to_port     = 443                                 # End of port range (same as start for a single port)
-    protocol    = "tcp"                               # Protocol type (TCP for HTTPS)
-    cidr_blocks = ["0.0.0.0/0"]                       # WARNING: Allows traffic from ANY IP address (highly insecure!)
+    description = "allow https for ssm"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # EGRESS: Allows all outbound traffic (default open rule)
+  # ------------------------------------------------------------------------------
+  # Allow all outbound traffic
+  # ------------------------------------------------------------------------------
   egress {
-    from_port   = 0                                   # Start of port range (0 means all ports)
-    to_port     = 0                                   # End of port range (0 means all ports)
-    protocol    = "-1"                                # Protocol (-1 means all protocols)
-    cidr_blocks = ["0.0.0.0/0"]                       # Allows outbound traffic to ANY destination
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }

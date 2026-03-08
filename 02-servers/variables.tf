@@ -30,6 +30,6 @@ variable "computers_ou" {
 variable "vpc_name" {
   description = "Name tag assigned to the Active Directory VPC"
   type        = string
-  default     = "directory-vpc"
+  default     = "ad-ws-vpc"
 }
 

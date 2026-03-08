@@ -95,10 +95,10 @@ function Create-ADUserFromSecret {
 }
 
 # Create users with predefined groups
-Create-ADUserFromSecret "jsmith_ad_credentials" "John" "Smith" "John Smith" "jsmith@mikecloud.com" "jsmith" @("mcloud-users", "us", "linux-admins")
-Create-ADUserFromSecret "edavis_ad_credentials" "Emily" "Davis" "Emily Davis" "edavis@mikecloud.com" "edavis" @("mcloud-users", "us")
-Create-ADUserFromSecret "rpatel_ad_credentials" "Raj" "Patel" "Raj Patel" "rpatel@mikecloud.com" "rpatel" @("mcloud-users", "india", "linux-admins")
-Create-ADUserFromSecret "akumar_ad_credentials" "Amit" "Kumar" "Amit Kumar" "akumar@mikecloud.com" "akumar" @("mcloud-users", "india")
+Create-ADUserFromSecret "jsmith_ad_credentials_ws" "John" "Smith" "John Smith" "jsmith@mikecloud.com" "jsmith" @("mcloud-users", "us", "linux-admins")
+Create-ADUserFromSecret "edavis_ad_credentials_ws" "Emily" "Davis" "Emily Davis" "edavis@mikecloud.com" "edavis" @("mcloud-users", "us")
+Create-ADUserFromSecret "rpatel_ad_credentials_ws" "Raj" "Patel" "Raj Patel" "rpatel@mikecloud.com" "rpatel" @("mcloud-users", "india", "linux-admins")
+Create-ADUserFromSecret "akumar_ad_credentials_ws" "Amit" "Kumar" "Amit Kumar" "akumar@mikecloud.com" "akumar" @("mcloud-users", "india")
 
 # ------------------------------------------------------------
 # Grant RDP Access to All Users in "mcloud-users" Group

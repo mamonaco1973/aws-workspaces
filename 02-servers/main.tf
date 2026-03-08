@@ -1,91 +1,171 @@
-# Define the AWS provider and set the region to us-east-1 (Virginia)
-# Modify this if your deployment requires a different AWS region
+# ================================================================================
+# AWS Provider Configuration
+# --------------------------------------------------------------------------------
+# Configures the AWS provider used by this Terraform module.
+#
+# Key Points
+# - Sets the default AWS region.
+# - All resources and data sources in this module will use this region.
+# ================================================================================
+
 provider "aws" {
   region = "us-east-1"
 }
 
-# Fetch AWS Secrets Manager secrets for different Active Directory users
-# These secrets store AD credentials for authentication purposes
+# ================================================================================
+# Active Directory Credential Secrets
+# --------------------------------------------------------------------------------
+# Retrieves credential secrets stored in AWS Secrets Manager.
+#
+# Key Points
+# - Each secret contains a JSON object with username and password.
+# - Credentials are used for authentication during instance bootstrap.
+# - Secrets are created in the directory deployment phase.
+# ================================================================================
 
+# ------------------------------------------------------------------------------
+# Raj Patel credentials
+# ------------------------------------------------------------------------------
 data "aws_secretsmanager_secret" "rpatel_secret" {
-  name = "rpatel_ad_credentials" # Secret name in AWS Secrets Manager
+  name = "rpatel_ad_credentials_ws"
 }
 
+# ------------------------------------------------------------------------------
+# Emily Davis credentials
+# ------------------------------------------------------------------------------
 data "aws_secretsmanager_secret" "edavis_secret" {
-  name = "edavis_ad_credentials" # Secret name in AWS Secrets Manager
+  name = "edavis_ad_credentials_ws"
 }
 
+# ------------------------------------------------------------------------------
+# Active Directory administrator credentials
+# ------------------------------------------------------------------------------
 data "aws_secretsmanager_secret" "admin_secret" {
-  name = "admin_ad_credentials" # Secret name for the admin user in AWS Secrets Manager
+  name = "admin_ad_credentials_ws"
 }
 
+# ------------------------------------------------------------------------------
+# John Smith credentials
+# ------------------------------------------------------------------------------
 data "aws_secretsmanager_secret" "jsmith_secret" {
-  name = "jsmith_ad_credentials" # Secret name in AWS Secrets Manager
+  name = "jsmith_ad_credentials_ws"
 }
 
+# ------------------------------------------------------------------------------
+# Amit Kumar credentials
+# ------------------------------------------------------------------------------
 data "aws_secretsmanager_secret" "akumar_secret" {
-  name = "akumar_ad_credentials" # Secret name in AWS Secrets Manager
+  name = "akumar_ad_credentials_ws"
 }
 
-# Retrieve information about a specific AWS subnet using a tag-based filter
-# This subnet will be used for AD services deployment
-
-data "aws_subnet" "ad_private_subnet_1" {
-  filter {
-    name   = "tag:Name" # Match based on the 'Name' tag
-    values = ["ad-private-subnet-1"] # Look for a subnet tagged as "ad-private-subnet-1"
-  }
-}
-
-# Retrieve information about another AWS subnet for redundancy or HA
-
-data "aws_subnet" "ad_private_subnet_2" {
-  filter {
-    name   = "tag:Name"
-    values = ["ad-private-subnet-2"] # Look for a subnet tagged as "ad-private-subnet-2"
-  }
-}
-
-# Retrieve details of the AWS VPC where Active Directory components will be deployed
-# Uses a tag-based filter to locate the correct VPC
+# ================================================================================
+# Active Directory VPC
+# --------------------------------------------------------------------------------
+# Retrieves the VPC used by the Active Directory deployment.
+# ================================================================================
 
 data "aws_vpc" "ad_vpc" {
   filter {
     name   = "tag:Name"
-    values = ["ad-vpc"] # Look for a VPC tagged as "ad-vpc"
+    values = [var.vpc_name]
   }
 }
 
-# Fetch the most recent Ubuntu AMI provided by Canonical
-# This ensures that the latest security patches and features are included
+# ================================================================================
+# Active Directory Private Subnet 1
+# --------------------------------------------------------------------------------
+# Retrieves the first private subnet inside the AD VPC.
+#
+# Key Points
+# - Matches the subnet by Name tag.
+# - Restricts the lookup to the AD VPC.
+# ================================================================================
+
+data "aws_subnet" "ad_private_subnet_1" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.ad_vpc.id]
+  }
+
+  filter {
+    name   = "tag:Name"
+    values = ["ad-ws-private-subnet-1"]
+  }
+}
+
+# ================================================================================
+# Active Directory Private Subnet 2
+# --------------------------------------------------------------------------------
+# Retrieves the second private subnet inside the AD VPC.
+#
+# Key Points
+# - Matches the subnet by Name tag.
+# - Restricts the lookup to the AD VPC.
+# ================================================================================
+
+data "aws_subnet" "ad_private_subnet_2" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.ad_vpc.id]
+  }
+
+  filter {
+    name   = "tag:Name"
+    values = ["ad-ws-private-subnet-2"]
+  }
+}
+
+# ================================================================================
+# Ubuntu AMI
+# --------------------------------------------------------------------------------
+# Retrieves the most recent Ubuntu 24.04 LTS image published by Canonical.
+#
+# Key Points
+# - Ensures the instance uses the latest security-patched image.
+# - Filters for the x86_64 Ubuntu Noble release.
+# ================================================================================
 
 data "aws_ami" "ubuntu_ami" {
-  most_recent = true                         # Get the latest available AMI
-  owners      = ["099720109477"]             # Canonical's AWS Account ID for official Ubuntu images
+  most_recent = true
+  owners      = ["099720109477"]  # Canonical official account
 
   filter {
-    name   = "name"                          # Filter AMIs by name pattern
-    values = ["*ubuntu-noble-24.04-amd64-*"] # Match Ubuntu 24.04 LTS AMI for x86_64 architecture
+    name   = "name"
+    values = ["*ubuntu-noble-24.04-amd64-*"]
   }
 }
 
-# Fetch the most recent Windows Server 2022 AMI provided by AWS
-# This ensures we deploy the latest Windows Server OS image
+# ================================================================================
+# Windows Server AMI
+# --------------------------------------------------------------------------------
+# Retrieves the most recent Windows Server 2022 image published by AWS.
+#
+# Key Points
+# - Used for Windows-based instances in the deployment.
+# - Ensures the latest base image with security updates.
+# ================================================================================
 
 data "aws_ami" "windows_ami" {
-  most_recent = true                     # Fetch the latest Windows Server AMI
-  owners      = ["amazon"]               # AWS official account for Windows AMIs
+  most_recent = true
+  owners      = ["amazon"]  # AWS official account
 
   filter {
-    name   = "name"                                      # Filter AMIs by name pattern
-    values = ["Windows_Server-2022-English-Full-Base-*"] # Match Windows Server 2022 AMI
+    name   = "name"
+    values = ["Windows_Server-2022-English-Full-Base-*"]
   }
 }
 
-# # Define an EC2 key pair to allow SSH access to instances
-# # The public key is read from an existing file
+# ================================================================================
+# Optional EC2 SSH Key Pair
+# --------------------------------------------------------------------------------
+# Defines an SSH key pair that can be used for instance login.
+#
+# Notes
+# - Requires a local public key file.
+# - Currently disabled but retained for optional use.
+# ================================================================================
 
 # resource "aws_key_pair" "ec2_key_pair" {
-#   key_name   = "ec2-key-pair"           # Name of the key pair in AWS
-#   public_key = file("./key.pem.pub")    # Read the public key from a local file
+#   key_name   = "ec2-key-pair"
+#   public_key = file("./key.pem.pub")
 # }
