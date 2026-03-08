@@ -61,9 +61,7 @@ echo ""
 
 if [ -n "${regcode}" ] && [ "${regcode}" != "None" ]; then
   echo "NOTE: WorkSpaces Registration Code: ${regcode}"
-else
-  echo "WARN: WorkSpaces registration code not found"
-fi
+end
 
 echo "NOTE: WorkSpaces URL: https://us-east-1.webclient.amazonworkspaces.com/login"
 
