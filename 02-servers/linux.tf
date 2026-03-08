@@ -45,8 +45,7 @@ resource "aws_instance" "linux_ad_instance" {
   # - Allows AWS Systems Manager connectivity.
   # ------------------------------------------------------------------------------
   vpc_security_group_ids = [
-    aws_security_group.ad_ssh_sg.id,
-    aws_security_group.ad_ssm_sg.id
+    aws_security_group.ad_ssh_sg.id
   ]
 
   # ------------------------------------------------------------------------------

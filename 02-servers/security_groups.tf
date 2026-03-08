@@ -91,39 +91,3 @@ resource "aws_security_group" "ad_ssh_sg" {
 }
 
 
-# ================================================================================
-# Systems Manager Security Group
-# --------------------------------------------------------------------------------
-# Allows HTTPS communication required for AWS Systems Manager (SSM).
-#
-# Notes
-# - SSM agents communicate over HTTPS (port 443).
-# - Typically outbound-only communication is required.
-# ================================================================================
-
-resource "aws_security_group" "ad_ssm_sg" {
-  name        = "ad-ssm-sg-${local.sg_suffix}"
-  description = "allow ssm https communication"
-  vpc_id      = data.aws_vpc.ad_vpc.id
-
-  # ------------------------------------------------------------------------------
-  # Inbound HTTPS access
-  # ------------------------------------------------------------------------------
-  ingress {
-    description = "allow https for ssm"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # ------------------------------------------------------------------------------
-  # Allow all outbound traffic
-  # ------------------------------------------------------------------------------
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}

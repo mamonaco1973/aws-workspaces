@@ -50,8 +50,7 @@ resource "aws_instance" "windows_ad_instance" {
   # - Allows AWS Systems Manager connectivity.
   # ------------------------------------------------------------------------------
   vpc_security_group_ids = [
-    aws_security_group.ad_rdp_sg.id,
-    aws_security_group.ad_ssm_sg.id
+    aws_security_group.ad_rdp_sg.id
   ]
 
   # ------------------------------------------------------------------------------
