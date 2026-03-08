@@ -33,19 +33,19 @@ Add-Computer -DomainName "${domain_fqdn}" -Credential $cred -Force -OUPath "${co
 
 Write-Output "Ensuring AD groups"
 
-if (-not (Get-ADGroup -Filter "Name -eq 'mcloud-users'" -ErrorAction SilentlyContinue)) {
+if (-not (Get-ADGroup -Filter "Name -eq 'mcloud-users'" -Credential $cred  -ErrorAction SilentlyContinue)) {
 New-ADGroup -Name "mcloud-users" -GroupCategory Security -GroupScope Universal -Credential $cred -OtherAttributes @{gidNumber='10001'}
 }
 
-if (-not (Get-ADGroup -Filter "Name -eq 'india'" -ErrorAction SilentlyContinue)) {
+if (-not (Get-ADGroup -Filter "Name -eq 'india'" -Credential $cred  -ErrorAction SilentlyContinue)) {
 New-ADGroup -Name "india" -GroupCategory Security -GroupScope Universal -Credential $cred -OtherAttributes @{gidNumber='10002'}
 }
 
-if (-not (Get-ADGroup -Filter "Name -eq 'us'" -ErrorAction SilentlyContinue)) {
+if (-not (Get-ADGroup -Filter "Name -eq 'us'" -Credential $cred  -ErrorAction SilentlyContinue)) {
 New-ADGroup -Name "us" -GroupCategory Security -GroupScope Universal -Credential $cred -OtherAttributes @{gidNumber='10003'}
 }
 
-if (-not (Get-ADGroup -Filter "Name -eq 'linux-admins'" -ErrorAction SilentlyContinue)) {
+if (-not (Get-ADGroup -Filter "Name -eq 'linux-admins'" -Credential $cred  -ErrorAction SilentlyContinue)) {
 New-ADGroup -Name "linux-admins" -GroupCategory Security -GroupScope Universal -Credential $cred -OtherAttributes @{gidNumber='10004'}
 }
 
@@ -63,7 +63,7 @@ param (
 [array]$Groups
 )
 
-$userExists = Get-ADUser -Filter "SamAccountName -eq '$Username'" -ErrorAction SilentlyContinue
+$userExists = Get-ADUser -Filter "SamAccountName -eq '$Username'" -Credential $cred -ErrorAction SilentlyContinue
 
 if (-not $userExists) {
 
