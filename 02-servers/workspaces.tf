@@ -87,7 +87,7 @@ data "aws_directory_service_directory" "mcloud" {
 # # Data Source: Windows Standard WorkSpaces Bundle
 # # ----------------------------------------------------
 # data "aws_workspaces_bundle" "windows_standard_bundle" {
-#   bundle_id = "wsb-93xk71ss4"  # Pre-defined Amazon bundle ID for Windows
+#   bundle_id = "wsb-fb2xfp6r8"  # Pre-defined Amazon bundle ID for Windows
 # }
 
 # # ---------------------------------------------------
@@ -107,9 +107,9 @@ data "aws_directory_service_directory" "mcloud" {
 
 #   # Define compute/storage settings for the instance
 #   workspace_properties {
-#     compute_type_name                         = "STANDARD"  # Mid-tier compute
+#     compute_type_name                         = "VALUE   "  # Mid-tier compute
 #     root_volume_size_gib                      = 80          # Root disk size in GiB
-#     user_volume_size_gib                      = 50          # User profile disk size in GiB
+#     user_volume_size_gib                      = 10          # User profile disk size in GiB
 #     running_mode                              = "AUTO_STOP" # Save cost by stopping when idle
 #     running_mode_auto_stop_timeout_in_minutes = 60          # Auto-stop after 60 minutes of inactivity
 #   }
