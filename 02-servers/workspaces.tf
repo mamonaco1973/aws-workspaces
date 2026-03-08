@@ -13,11 +13,30 @@ data "aws_directory_service_directory" "mcloud" {
   directory_id = var.directory_id  # Pulls directory metadata based on provided ID
 }
 
-# ----------------------------------
+# ================================================================================
+# Unique Deployment Identifier
+# --------------------------------------------------------------------------------
+# Generates a unique identifier used to prevent naming collisions across
+# multiple Terraform deployments.
+# ================================================================================
+
+resource "random_id" "build_id" {
+  byte_length = 3
+}
+
+locals {
+  build_suffix = random_id.build_id.hex
+}
+
+# ================================================================================
 # IAM Role for WorkSpaces Service
-# ----------------------------------
+# --------------------------------------------------------------------------------
+# Creates the IAM role required by AWS WorkSpaces. A unique suffix is appended
+# to the role name to avoid collisions across multiple deployments.
+# ================================================================================
+
 resource "aws_iam_role" "workspaces_default" {
-  name = "workspaces_DefaultRole"  # IAM Role name assigned to WorkSpaces
+  name = "workspaces_DefaultRole_${local.build_suffix}"
 
   # Trust policy: allows AWS WorkSpaces to assume this role
   assume_role_policy = jsonencode({
@@ -25,7 +44,7 @@ resource "aws_iam_role" "workspaces_default" {
     Statement = [{
       Effect = "Allow",
       Principal = {
-        Service = "workspaces.amazonaws.com"  # Trusted entity
+        Service = "workspaces.amazonaws.com"
       },
       Action = "sts:AssumeRole"
     }]
