@@ -1,165 +1,163 @@
-# AWS WorkSpaces
+# Amazon WorkSpaces with AWS Managed Microsoft AD
 
-This is a follow-up to the [AWS Directory Service](https://youtu.be/1lnSxfFmGPY) video and [GitHub Project](https://github.com/mamonaco1973/aws-active-directory/blob/main/README.md).
-The project materials for AWS workspaces shows up in the `workspaces` branch in the original project.
+A follow-up to the [AWS Directory Service](https://github.com/mamonaco1973/aws-active-directory)
+lab ([video](https://youtu.be/1lnSxfFmGPY)). The same **AWS Managed
+Microsoft AD** domain, `mcloud.mikecloud.com`, is registered with **Amazon
+WorkSpaces**, and a Windows WorkSpace is provisioned for the domain's
+`Admin` user. The Linux and Windows domain members move to **private
+subnets** with no public IPs, so the WorkSpace is the way in: a cloud
+desktop that works as a jump box for SSH and RDP inside the VPC.
 
-## Introduction
+The lab moves to **us-east-1**, because WorkSpaces isn't offered in
+us-east-2 (see [WorkSpaces availability zones](https://docs.aws.amazon.com/workspaces/latest/adminguide/azs-workspaces.html)).
 
-In the original [**AWS Directory Service** project](https://github.com/mamonaco1973/aws-active-directory), we deployed:
+![The Admin WorkSpace desktop](workspaces2.png)
 
-- An Active Directory domain: `mcloud.mikecloud.com` in us-east-2
-- Several users and groups in Active Directory
-- A public Linux EC2 instance joined to the domain (SSH enabled)
-- A public Windows EC2 instance joined to the domain (RDP enabled)
+| Piece | Where | Role |
+|---|---|---|
+| **mcloud.mikecloud.com** | AWS Managed Microsoft AD, Standard | NetBIOS `MCLOUD`; two DCs in `ad-ws-private-subnet-1` and `-2` (`use1-az6`, `use1-az4`); the VPC's DHCP options point DNS at them |
+| **WorkSpaces directory** | us-east-1 | the domain registered with WorkSpaces; every client type allowed; self-service for compute type, volume size, rebuild, restart and running mode |
+| **Admin WorkSpace** | WorkSpaces | Windows bundle `wsb-fb2xfp6r8`, `VALUE` compute, 80 GiB root and 10 GiB user volumes, `AUTO_STOP` after 60 minutes |
+| **linux-ad-instance** | `ad-ws-private-subnet-1` | Ubuntu 24.04, `t2.micro`; joins the domain with realm and SSSD; `linux-admins` get sudo |
+| **windows-ad-instance** | `ad-ws-private-subnet-2` | Windows Server 2022, `t2.medium`; joins the domain, installs RSAT, and creates the lab's groups and users |
+| **Secrets Manager** | us-east-1 | `admin_ad_credentials_ws` and one `*_ad_credentials_ws` secret per user |
+| **ad-ws-vpc** | `10.0.0.0/24` | a public NAT subnet and the two private subnets; NAT gateway for outbound traffic |
+| **Client branding** | `brand.sh` | uploads `logo.png` and the login message `@MikesCloudSolutions` for every client type |
 
-## What This Project Adds
+## Architecture
 
-This project builds upon the original by making the following changes:
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="architecture-dark.svg">
+  <img alt="A WorkSpaces client signs in with the directory's registration code to the Admin WorkSpace, a Windows desktop in us-east-1 registered with AWS Managed Microsoft AD for mcloud.mikecloud.com. The WorkSpace acts as a jump box: from it, the Admin user SSHes to linux-ad-instance and RDPs to windows-ad-instance, both in private subnets with no public IPs. Each instance reads the AD admin password from Secrets Manager at boot and joins the domain, the Linux one with realm and SSSD; the Windows one also creates the lab's groups and users. A NAT gateway gives the private subnets outbound access." src="architecture-light.svg">
+</picture>
 
-- EC2 instances will be moved to **private subnets**, removing public exposure.
-- The deployment will be moved to the **`us-east-1`** region, as **WorkSpaces are not supported** in us-east-2. See [Availablity Zones for Workspaces](https://docs.aws.amazon.com/workspaces/latest/adminguide/azs-workspaces.html#:~:text=Amazon%20WorkSpaces%20is%20only%20available,usgw1%2Daz2%20%2C%20usgw1%2Daz3)
-- The `mcloud.mikecloud.com` domain will be **registered for AWS WorkSpaces**.
-- A WorkSpace will be provisioned for the **`Admin` Active Directory user**.
-- The WorkSpace acts as a secure access point to reach private EC2 instances within the VPC. In this setup, the WorkSpace effectively functions as a jump box, enabling access to internal resources without exposing them to the public internet.
+Regenerate with `python3 make_diagram.py`.
 
-![AWS diagram](aws-directory.png)
+- **`01-directory/`**: the VPC, subnets, NAT gateway and DHCP options, the
+  passwords in Secrets Manager, and the managed directory.
+- **`02-servers/`**: the two instances and their user data, their IAM role
+  and security groups, and `workspaces.tf` (the WorkSpaces role, the
+  directory registration and the Admin WorkSpace).
+- **`brand.sh`**: imports the client branding for the directory.
 
-## Overview of Desktop as a Service
+## What is Desktop as a Service?
 
-**Desktop as a Service (DaaS)** is a cloud computing solution that delivers virtual desktops to end users over the internet. Instead of managing physical desktops or complex VDI infrastructure, organizations can quickly provision secure, scalable desktop environments from the cloud.
+**Desktop as a Service (DaaS)** delivers virtual desktops from the cloud
+instead of from physical PCs or a self-managed VDI stack. Users connect
+from a native client or a browser; IT manages images, security and cost
+centrally. **Amazon WorkSpaces** is AWS's DaaS: Windows or Linux desktops
+that join your Active Directory, with encrypted storage and an auto-stop
+mode that bills by the hour when idle desktops are stopped.
 
-With DaaS, users can access their desktop from anywhere using a browser or native client, while IT benefits from simplified management, centralized security, and predictable billing.
+Typical uses are secure access for remote staff or contractors, short-lived
+desktops for training or testing, seasonal capacity, and cutting desktop
+patching and support.
 
-**AWS WorkSpaces** is Amazon’s DaaS offering, enabling deployment of Windows or Linux desktops that integrate with Active Directory. It supports features like auto-stop to reduce costs, encrypted storage, and domain joins for enterprise control.
+## Users and groups
 
-Typical use cases include:
+The Windows instance creates these at boot. Every user's primary
+`gidNumber` is 10001 (`mcloud-users`).
 
-- Secure remote access for employees or contractors  
-- Temporary desktop environments for training or testing  
-- Scalable desktops for seasonal or project-based workloads  
-- Minimizing IT overhead for desktop management and patching
+| User | Groups | uidNumber |
+|---|---|---|
+| jsmith | mcloud-users, us, linux-admins | 10001 |
+| edavis | mcloud-users, us | 10002 |
+| rpatel | mcloud-users, india, linux-admins | 10003 |
+| akumar | mcloud-users, india | 10004 |
+
+| Group | gidNumber |
+|---|---|
+| mcloud-users | 10001 |
+| india | 10002 |
+| us | 10003 |
+| linux-admins | 10004 |
+
+The WorkSpace belongs to the directory's built-in `Admin` account, whose
+password is in `admin_ad_credentials_ws`.
 
 ## Prerequisites
 
 * [An AWS Account](https://aws.amazon.com/console/)
-* [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) 
-* [Install Latest Terraform](https://developer.hashicorp.com/terraform/install)
-* [Install a Workspaces Client](https://clients.amazonworkspaces.com/)
+* [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+* [Install Terraform](https://developer.hashicorp.com/terraform/install)
+* [Install a WorkSpaces client](https://clients.amazonworkspaces.com/), or use the web client
 
-If this is your first time watching our content, we recommend starting with this video: [AWS + Terraform: Easy Setup](https://youtu.be/BCMQo0CB9wk). It provides a step-by-step guide to properly configure Terraform, Packer, and the AWS CLI.
+If this is your first time watching our content, we recommend starting with
+this video: [AWS + Terraform: Easy Setup](https://youtu.be/BCMQo0CB9wk).
 
-## Download this Repository
+## Deploy
 
 ```bash
-git clone https://github.com/mamonaco1973/aws-workspaces
+git clone https://github.com/mamonaco1973/aws-workspaces.git
 cd aws-workspaces
+./apply.sh
 ```
 
-## Build the Code
+`apply.sh` runs `check_env.sh`, then:
 
-Run [check_env](check_env.sh) then run [apply](apply.sh).
+1. Applies **`01-directory`**: the network, the secrets and the managed
+   directory. The directory takes **30 to 60 minutes**.
+2. Looks up the directory ID and applies **`02-servers`** with it: the two
+   instances, which join the domain from their user data, the WorkSpaces
+   registration and the Admin WorkSpace.
+3. Runs `brand.sh` to upload the client branding.
+
+It ends by running `validate.sh`:
+
+```
+============================================================================
+WorkSpaces Quick Start - Validation Output
+============================================================================
+
+NOTE: WorkSpaces Registration Code: SLiad+XXXXXX
+NOTE: WorkSpaces URL:               https://us-east-1.webclient.amazonworkspaces.com/login
+
+NOTE: Windows instance:             ip-10-0-0-200.ec2.internal
+NOTE: Linux instance:               ip-10-0-0-150.ec2.internal
+```
+
+The directory in the console:
+
+![The directory in AWS Directory Service](console1.png)
+
+and the two private instances:
+
+![The domain-joined EC2 instances](console2.png)
+
+## Try it
+
+1. Get the `Admin` password from the `admin_ad_credentials_ws` secret.
+2. Open the WorkSpaces client (or the web client URL above) and enter the
+   **registration code**. The branding from `brand.sh` shows on the sign-in
+   screen:
+
+   ![WorkSpaces client with custom branding](workspaces1.png)
+
+3. Sign in as `Admin` and connect to the Windows WorkSpace.
+4. From the WorkSpace, RDP to the **Windows instance** or SSH to the
+   **Linux instance** by the private names `validate.sh` printed, as `Admin`
+   or one of the users above (passwords in their `*_ad_credentials_ws`
+   secrets).
+
+## Teardown
 
 ```bash
-develop-vm:~/aws-workspace$ ./apply.sh
-NOTE: Validating that required commands are found in your PATH.
-NOTE: aws is found in the current PATH.
-NOTE: terraform is found in the current PATH.
-NOTE: All required commands are available.
-NOTE: Checking AWS cli connection.
-NOTE: Successfully logged into AWS.
-Initializing the backend...
-Initializing provider plugins...
-- Reusing previous version of hashicorp/random from the dependency lock file
-- Reusing previous version of hashicorp/aws from the dependency lock file
-- Using previously-installed hashicorp/random v3.7.1
-- Using previously-installed hashicorp/aws v5.89.0
-
-Terraform has been successfully initialized!
-
-You may now begin working with Terraform. Try running "terraform plan" to see
-any changes that are required for your infrastructure. All Terraform commands
-should now work.
-
-If you ever set or change modules or backend configuration for Terraform,
-rerun this command to reinitialize your working directory. If you forget, other
-commands will detect it and remind you to do so if necessary.
-
-[...]
+./destroy.sh
 ```
 
-### Build Process Overview  
+`destroy.sh` destroys `02-servers` (including the WorkSpace), deletes the
+five secrets without a recovery window, then destroys `01-directory`.
 
-The build process consists of two phases:
+## Notes
 
-1. **Phase 1:**  
-   Use Terraform to provision the required networking and deploy the AWS Directory Service instance. This phase typically takes **30–60 minutes** to complete.
-
-2. **Phase 2:**  
-   After the directory service is provisioned, Terraform deploys both a Linux and a Windows EC2 instance, along with the `Admin` WorkSpace. Each EC2 instance runs a **user data script** during initialization to automatically join the domain.
-
-## Review Build Results
-
-This section shows the key components of the environment after deployment:
-
-- **The Active Directory Instance**  
-
-  The AWS Directory Service provides the core identity infrastructure, allowing EC2 instances and WorkSpaces to join the domain.  
-
-  ![AWS Directory](console1.png)
-
-- **The EC2 Instance2**  
-
-EC2 instances are domain-joined during initialization and can be accessed using RDP and SSH via the private network.  
-  
-  ![AWS EC2 Instance](console2.png)
-
-- **The Workspace Client**  
-
-  The WorkSpaces client application is used to securely access the virtual desktop provisioned for the `Admin` user.  Note the custom branding logo that we uploaded during the build.
-  
-  ![Workspace Client](workspaces1.png)
-
-- **The Admin Workspace**  
-
-  This cloud-based Windows desktop is fully domain-joined and acts as a secure bastion host for managing the private environment.  
-  
-  ![Workspace Desktop](workspaces2.png)
-
-
-## Steps to Log into Your AWS WorkSpace
-
-1. **Launch the WorkSpaces Client**  
-   Open the [AWS WorkSpaces Client](https://clients.amazonworkspaces.com/) on your local machine (Windows, macOS, or browser-based).
-
-2. **Retrieve the "Admin" Credentials from AWS Secrets Manager**  
-   Use **AWS Secrets Manager** to retrieve the **"Admin"** username and password used to authenticate into Active Directory.
-
-3. **Log In with Retrieved Credentials**  
-   Enter the **registration code** associated with your WorkSpace, then sign in using the retrieved "Admin" credentials.
-
-4. **Launch the Windows Desktop**  
-   Click **Connect** for the assigned Windows WorkSpace. The virtual desktop will launch in a new window.
-
-## Run the "destroy" script when you are done
-
-```bash
-~/aws-active-directory$ ./destroy.sh
-Initializing the backend...
-Initializing provider plugins...
-- Reusing previous version of hashicorp/aws from the dependency lock file
-- Using previously-installed hashicorp/aws v5.89.0
-
-Terraform has been successfully initialized!
-
-You may now begin working with Terraform. Try running "terraform plan" to see
-any changes that are required for your infrastructure. All Terraform commands
-should now work.
-
-If you ever set or change modules or backend configuration for Terraform,
-rerun this command to reinitialize your working directory. If you forget, other
-commands will detect it and remind you to do so if necessary.
-data.aws_ami.ubuntu_ami: Reading...
-data.aws_ami.windows_ami: Reading...
-[...]
-```
-
+- **Lab only.** The SSH and RDP security groups allow `0.0.0.0/0`; the
+  instances have no public IPs, so in practice that means anything in the
+  VPC, including the WorkSpace.
+- The Linux instance has SSH password authentication turned on so AD users
+  can sign in with their passwords.
+- WorkSpaces bills per WorkSpace even in `AUTO_STOP` mode (a monthly
+  storage fee plus hourly use), and the managed directory bills by the
+  hour, so tear the lab down when you're done.
+- The bundle ID is hard-coded; if AWS retires `wsb-fb2xfp6r8`, look up a
+  current Windows bundle with `aws workspaces describe-workspace-bundles
+  --owner AMAZON`.
