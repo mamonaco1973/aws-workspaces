@@ -1,118 +1,50 @@
 #!/bin/bash
-
-# ================================================================================
-# Workspace Apply Script
-# --------------------------------------------------------------------------------
-# Orchestrates the full deployment workflow for the Active Directory workspace
-# environment.
+# ==============================================================================
+# apply.sh — deploy the WorkSpaces lab in two Terraform phases
 #
-# Workflow
-# - Validate environment and required tooling
-# - Deploy Active Directory infrastructure
-# - Retrieve directory ID
-# - Deploy EC2 infrastructure joined to the directory
-# - Apply optional branding
-# - Run deployment validation
-# ================================================================================
+# Phase 2 needs the directory ID that phase 1 creates, so it is looked up by
+# name between the phases rather than passed through remote state. Re-running
+# is safe: both phases are plain terraform apply and brand.sh overwrites.
+# ==============================================================================
 
+set -euo pipefail
 
-# ================================================================================
-# Step 0: Set AWS Region
-# --------------------------------------------------------------------------------
-# Sets the default AWS region for all AWS CLI and Terraform operations.
-# ================================================================================
-
-export AWS_DEFAULT_REGION=us-east-1
-
-
-# ================================================================================
-# Step 1: Run Environment Preflight Check
-# --------------------------------------------------------------------------------
-# Validates that required tools and credentials are configured correctly.
-#
-# Notes
-# - check_env.sh should verify AWS CLI, Terraform, and required binaries.
-# - Script exits immediately if validation fails.
-# ================================================================================
+# WorkSpaces is not offered in us-east-2, the region the parent AD lab uses.
+export AWS_DEFAULT_REGION="us-east-1"
+DIRECTORY_NAME="mcloud.mikecloud.com"
 
 ./check_env.sh
 
-if [ $? -ne 0 ]; then
-  echo "ERROR: Environment check failed. Exiting."
+# ------------------------------------------------------------------------------
+# Phase 1: network, secrets and AWS Managed Microsoft AD (30-60 minutes)
+# ------------------------------------------------------------------------------
+echo "NOTE: Deploying the network and the managed directory..."
+
+cd 01-directory
+terraform init
+terraform apply -auto-approve
+cd ..
+
+directory_id=$(aws ds describe-directories \
+  --query "DirectoryDescriptions[?Name=='${DIRECTORY_NAME}'].DirectoryId" \
+  --output text)
+
+if [ -z "${directory_id}" ] || [ "${directory_id}" = "None" ]; then
+  echo "ERROR: Directory ${DIRECTORY_NAME} not found after phase 1."
   exit 1
 fi
 
-set -e  # Exit immediately if any command fails
-
-
-# ================================================================================
-# Step 2: Deploy Active Directory Infrastructure
-# --------------------------------------------------------------------------------
-# Deploys the directory services infrastructure using Terraform.
-#
-# Components
-# - AWS Managed Microsoft Active Directory
-# - VPC networking resources
-# - Supporting infrastructure
-# ================================================================================
-
-cd 01-directory
-
-terraform init
-terraform apply -auto-approve
-
-cd ..
-
-# ================================================================================
-# Step 3: Discover Directory ID
-# --------------------------------------------------------------------------------
-# Retrieves the directory ID for the deployed Active Directory instance.
-#
-# Notes
-# - This ID is required by the EC2 provisioning phase.
-# - Retrieved dynamically using the AWS CLI.
-# ================================================================================
-
-directory_id=$(aws ds describe-directories \
-  --region us-east-1 \
-  --query "DirectoryDescriptions[?Name=='mcloud.mikecloud.com'].DirectoryId" \
-  --output text)
-
-
-# ================================================================================
-# Step 4: Deploy EC2 Infrastructure
-# --------------------------------------------------------------------------------
-# Launches EC2 servers and joins them to the deployed Active Directory.
-#
-# Inputs
-# - directory_id obtained from the previous step.
-# ================================================================================
+# ------------------------------------------------------------------------------
+# Phase 2: domain members, WorkSpaces registration and the Admin WorkSpace
+# ------------------------------------------------------------------------------
+echo "NOTE: Deploying the servers and the WorkSpace..."
 
 cd 02-servers
-
 terraform init
-terraform apply -var="directory_id=$directory_id" -auto-approve
-
+terraform apply -var="directory_id=${directory_id}" -auto-approve
 cd ..
 
-
-# ================================================================================
-# Step 5: Apply Workspace Branding
-# --------------------------------------------------------------------------------
-# Runs optional branding customization for the workspace environment.
-#
-# Notes
-# - Typically used to customize logos or portal appearance.
-# ================================================================================
-
-echo "NOTE: Branding the Workspaces."
+echo "NOTE: Branding the WorkSpaces clients."
 ./brand.sh
-
-
-# ================================================================================
-# Step 6: Validate Deployment
-# --------------------------------------------------------------------------------
-# Runs the validation script to confirm that the environment deployed correctly.
-# ================================================================================
 
 ./validate.sh

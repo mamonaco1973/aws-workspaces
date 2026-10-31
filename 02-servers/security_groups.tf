@@ -1,10 +1,14 @@
-# ================================================================================
-# Unique Security Group Identifier
-# --------------------------------------------------------------------------------
-# Generates a unique suffix used for security group names. This prevents naming
-# collisions across multiple Terraform deployments.
-# ================================================================================
+# ==============================================================================
+# Security groups — RDP to the Windows server, SSH to the Linux one
+#
+# The rules say 0.0.0.0/0, but neither instance has a public IP and the
+# subnets have no inbound route, so in practice only sources inside the VPC
+# (the WorkSpace) can reach them. The descriptions below predate the move to
+# private subnets; they are left as-is because changing a security group's
+# description forces Terraform to replace it.
+# ==============================================================================
 
+# Random suffix so the names don't collide with another deployment's groups.
 resource "random_id" "sg_id" {
   byte_length = 3
 }
@@ -13,26 +17,11 @@ locals {
   sg_suffix = random_id.sg_id.hex
 }
 
-
-# ================================================================================
-# RDP Security Group
-# --------------------------------------------------------------------------------
-# Allows Remote Desktop Protocol access to Windows instances.
-#
-# WARNING
-# - This configuration allows unrestricted internet access (0.0.0.0/0).
-# - This is NOT recommended for production environments.
-# - Restrict access to trusted CIDR ranges when possible.
-# ================================================================================
-
 resource "aws_security_group" "ad_rdp_sg" {
   name        = "ad-rdp-sg-${local.sg_suffix}"
   description = "allow rdp access from the internet"
   vpc_id      = data.aws_vpc.ad_vpc.id
 
-  # ------------------------------------------------------------------------------
-  # Inbound RDP access
-  # ------------------------------------------------------------------------------
   ingress {
     description = "allow rdp from anywhere"
     from_port   = 3389
@@ -41,9 +30,6 @@ resource "aws_security_group" "ad_rdp_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # ------------------------------------------------------------------------------
-  # Allow all outbound traffic
-  # ------------------------------------------------------------------------------
   egress {
     from_port   = 0
     to_port     = 0
@@ -52,25 +38,11 @@ resource "aws_security_group" "ad_rdp_sg" {
   }
 }
 
-
-# ================================================================================
-# SSH Security Group
-# --------------------------------------------------------------------------------
-# Allows SSH access to Linux instances.
-#
-# WARNING
-# - This rule allows access from anywhere on the internet.
-# - Restrict to trusted IP ranges for production environments.
-# ================================================================================
-
 resource "aws_security_group" "ad_ssh_sg" {
   name        = "ad-ssh-sg-${local.sg_suffix}"
   description = "allow ssh access from the internet"
   vpc_id      = data.aws_vpc.ad_vpc.id
 
-  # ------------------------------------------------------------------------------
-  # Inbound SSH access
-  # ------------------------------------------------------------------------------
   ingress {
     description = "allow ssh from anywhere"
     from_port   = 22
@@ -79,9 +51,6 @@ resource "aws_security_group" "ad_ssh_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # ------------------------------------------------------------------------------
-  # Allow all outbound traffic
-  # ------------------------------------------------------------------------------
   egress {
     from_port   = 0
     to_port     = 0
@@ -89,5 +58,3 @@ resource "aws_security_group" "ad_ssh_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
-
-

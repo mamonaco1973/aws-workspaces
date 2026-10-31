@@ -1,90 +1,56 @@
 #!/bin/bash
-# 🔧 This script updates branding for **ALL** supported AWS WorkSpaces client types.
-# 💣 It FAILS FAST and logs helpful error messages.
+# ==============================================================================
+# brand.sh — put logo.png and a login message on every WorkSpaces client
+#
+# Terraform's aws_workspaces_directory has no client-branding arguments, so
+# this goes through the CLI. import-client-branding overwrites, so re-running
+# is safe. A failure is reported but not fatal: branding is cosmetic and
+# should not stop apply.sh before validate.sh prints the registration code.
+# ==============================================================================
 
-# 🔍 Lookup the Directory ID based on the human-friendly directory name.
-# ⚠️ Assumes the directory "mcloud.mikecloud.com" exists in the target AWS region.
-directory_id=$(aws ds describe-directories \
-  --region us-east-1 \
-  --query "DirectoryDescriptions[?Name=='mcloud.mikecloud.com'].DirectoryId" \
-  --output text)
+set -euo pipefail
 
-# 📌 Set the branding parameters.
-RESOURCE_ID=$directory_id                      # ✅ ID of the AWS WorkSpaces directory to brand
-REGION="us-east-1"                             # 🌎 AWS region in use
-LOGO_FILE="logo.png"                           # 🖼️ Image file to be shown as the logo
-LOGIN_MESSAGE="@MikesCloudSolutions"           # 💬 Custom login message (change this to fit your brand)
+export AWS_DEFAULT_REGION="us-east-1"
+DIRECTORY_NAME="mcloud.mikecloud.com"
+LOGO_FILE="logo.png"
+LOGIN_MESSAGE="@MikesCloudSolutions"
 
-# 🚨 SANITY CHECK: Make sure the logo file exists before continuing!
-if [[ ! -f "$LOGO_FILE" ]]; then
-  echo "ERROR: File $LOGO_FILE not found."
-  exit 1                                        # ⛔ DIE FAST if logo is missing
+if [[ ! -f "${LOGO_FILE}" ]]; then
+  echo "ERROR: File ${LOGO_FILE} not found."
+  exit 1
 fi
 
-# 🧬 Convert the logo image to base64 in a single line (portable handling for different systems).
-# GNU base64 uses -w 0, BSD/macOS uses -b 0. Try both.
-BASE64_LOGO=$(base64 -w 0 "$LOGO_FILE" 2>/dev/null || base64 -b 0 "$LOGO_FILE")
+directory_id=$(aws ds describe-directories \
+  --query "DirectoryDescriptions[?Name=='${DIRECTORY_NAME}'].DirectoryId" \
+  --output text)
 
-# 📂 Create a temporary file to hold the JSON branding payload.
-TMP_JSON=$(mktemp)
+# GNU base64 wraps at 76 columns unless told -w 0; macOS takes -b 0 instead.
+logo_b64=$(base64 -w 0 "${LOGO_FILE}" 2>/dev/null \
+  || base64 -b 0 "${LOGO_FILE}")
 
-# 🛠️ Build the JSON payload with branding for ALL supported client types.
-# Each client type gets the same logo and login message.
-cat > "$TMP_JSON" <<EOF
+# The payload carries the logo inline, too large for a command-line argument.
+tmp_json=$(mktemp)
+trap 'rm -f "${tmp_json}"' EXIT
+
+branding="{\"Logo\": \"${logo_b64}\",
+  \"LoginMessage\": {\"en_US\": \"${LOGIN_MESSAGE}\"}}"
+
+cat > "${tmp_json}" <<EOF
 {
-  "ResourceId": "$RESOURCE_ID",
-  "DeviceTypeWindows": {
-    "Logo": "$BASE64_LOGO",
-    "LoginMessage": {
-      "en_US": "$LOGIN_MESSAGE"
-    }
-  },
-  "DeviceTypeWeb": {
-    "Logo": "$BASE64_LOGO",
-    "LoginMessage": {
-      "en_US": "$LOGIN_MESSAGE"
-    }
-  },
-  "DeviceTypeIos": {
-    "Logo": "$BASE64_LOGO",
-    "LoginMessage": {
-      "en_US": "$LOGIN_MESSAGE"
-    }
-  },
-  "DeviceTypeAndroid": {
-    "Logo": "$BASE64_LOGO",
-    "LoginMessage": {
-      "en_US": "$LOGIN_MESSAGE"
-    }
-  },
-  "DeviceTypeLinux": {
-    "Logo": "$BASE64_LOGO",
-    "LoginMessage": {
-      "en_US": "$LOGIN_MESSAGE"
-    }
-  },
-  "DeviceTypeOsx": {
-    "Logo": "$BASE64_LOGO",
-    "LoginMessage": {
-      "en_US": "$LOGIN_MESSAGE"
-    }
-  }
+  "ResourceId": "${directory_id}",
+  "DeviceTypeWindows": ${branding},
+  "DeviceTypeWeb": ${branding},
+  "DeviceTypeIos": ${branding},
+  "DeviceTypeAndroid": ${branding},
+  "DeviceTypeLinux": ${branding},
+  "DeviceTypeOsx": ${branding}
 }
 EOF
 
-# 🚀 Execute the AWS CLI command to upload the branding.
-# Uses the JSON we just built.
 echo "NOTE: Uploading branding to all client types..."
-aws workspaces import-client-branding \
-  --cli-input-json file://"$TMP_JSON" \
-  --region "$REGION" > /dev/null 2> /dev/null
 
-# 🧹 Clean up the temp file no matter what happens.
-STATUS=$?
-rm -f "$TMP_JSON"
-
-# ✅ SUCCESS or ❌ FAILURE feedback
-if [[ $STATUS -eq 0 ]]; then
+if aws workspaces import-client-branding \
+     --cli-input-json "file://${tmp_json}" >/dev/null; then
   echo "NOTE: Branding applied successfully to all clients."
 else
   echo "ERROR: Failed to apply branding."

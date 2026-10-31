@@ -9,10 +9,12 @@ A README diagram is studied, not narrated, so it is COMPLETE rather than
 minimal: the WorkSpaces client, the Admin WorkSpace and its directory
 registration, both private domain members, the managed directory, the
 secret store and the NAT gateway are all on it.
+
 Run:  python3 make_diagram.py
 """
 
 import os
+from html import escape
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -162,8 +164,6 @@ ALT = ("A WorkSpaces client signs in with the directory's registration code to t
 # ------------------------------------------------------------------------------
 # Rendering
 # ------------------------------------------------------------------------------
-from html import escape
-
 FONT = "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
 
 

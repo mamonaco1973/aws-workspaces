@@ -1,9 +1,12 @@
 # ==============================================================================
-# File: variables.tf
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Define configurable inputs for Active Directory deployment.
+# Inputs — must match what 01-directory created
 # ==============================================================================
+
+# No default: apply.sh looks the ID up after phase 1 and passes it in.
+variable "directory_id" {
+  description = "The ID of the AWS Directory Service directory"
+  type        = string
+}
 
 variable "ad_domain_name" {
   description = "Fully qualified domain name (FQDN) for Microsoft AD"
@@ -11,25 +14,16 @@ variable "ad_domain_name" {
   default     = "mcloud.mikecloud.com"
 }
 
-variable "netbios" {
-  description = "NetBIOS short name for the AD domain"
-  type        = string
-  default     = "MCLOUD"
-}
-
+# AWS Managed AD only delegates this OU to the Admin account, so joins
+# must place computer objects here rather than in the default container.
 variable "computers_ou" {
   description = "Computers OU for the join"
   type        = string
   default     = "OU=Computers,OU=MCLOUD,DC=mcloud,DC=mikecloud,DC=com"
 }
 
-# ------------------------------------------------------------------------------
-# VPC Name
-# ------------------------------------------------------------------------------
-
 variable "vpc_name" {
   description = "Name tag assigned to the Active Directory VPC"
   type        = string
   default     = "ad-ws-vpc"
 }
-

@@ -1,57 +1,30 @@
 #!/bin/bash
+# ==============================================================================
+# validate.sh — print what you need to try the lab
+#
+# The registration code is what the WorkSpaces client asks for first; the
+# instance names are private, so they only resolve from inside the WorkSpace.
+# ==============================================================================
 
-# ================================================================================
-# AWS Region
-# --------------------------------------------------------------------------------
-# Sets the default AWS region for all CLI calls in this script.
-# ================================================================================
+set -euo pipefail
 
-export AWS_DEFAULT_REGION=us-east-1
+export AWS_DEFAULT_REGION="us-east-1"
+DIRECTORY_NAME="mcloud.mikecloud.com"
+WEB_CLIENT_URL="https://us-east-1.webclient.amazonworkspaces.com/login"
 
-
-# ================================================================================
-# WorkSpaces Registration Code
-# --------------------------------------------------------------------------------
-# Retrieves the registration code for the target WorkSpaces directory.
-# ================================================================================
+get_private_dns_by_name_tag() {
+  aws ec2 describe-instances \
+    --filters "Name=tag:Name,Values=$1" \
+              "Name=instance-state-name,Values=running" \
+    --query "Reservations[].Instances[].PrivateDnsName" \
+    --output text | xargs
+}
 
 regcode=$(aws workspaces describe-workspace-directories \
-  --region us-east-1 \
-  --query "Directories[?DirectoryName=='mcloud.mikecloud.com'].RegistrationCode" \
+  --query "Directories[?DirectoryName=='${DIRECTORY_NAME}'].RegistrationCode" \
   --output text)
-
-
-# ================================================================================
-# Windows AD Instance Private DNS
-# --------------------------------------------------------------------------------
-# Looks up the private DNS name for the Windows AD instance.
-# Only instances in the running state are returned.
-# ================================================================================
-
-windows_dns_name=$(aws ec2 describe-instances \
-  --filters "Name=tag:Name,Values=windows-ad-instance" \
-            "Name=instance-state-name,Values=running" \
-  --query "Reservations[*].Instances[*].PrivateDnsName" \
-  --output text)
-
-
-# ================================================================================
-# Linux AD Instance Private DNS
-# --------------------------------------------------------------------------------
-# Looks up the private DNS name for the Linux AD instance.
-# Only instances in the running state are returned.
-# ================================================================================
-
-linux_dns_name=$(aws ec2 describe-instances \
-  --filters "Name=tag:Name,Values=linux-ad-instance" \
-            "Name=instance-state-name,Values=running" \
-  --query "Reservations[*].Instances[*].PrivateDnsName" \
-  --output text)
-
-
-# ------------------------------------------------------------------------------
-# Final Quick Start Output
-# ------------------------------------------------------------------------------
+windows_dns=$(get_private_dns_by_name_tag "windows-ad-instance")
+linux_dns=$(get_private_dns_by_name_tag "linux-ad-instance")
 
 echo ""
 echo "============================================================================"
@@ -63,21 +36,19 @@ if [ -n "${regcode}" ] && [ "${regcode}" != "None" ]; then
   printf "NOTE: %-28s %s\n" "WorkSpaces Registration Code:" "${regcode}"
 fi
 
-printf "NOTE: %-28s %s\n" "WorkSpaces URL:" "https://us-east-1.webclient.amazonworkspaces.com/login"
-
+printf "NOTE: %-28s %s\n" "WorkSpaces URL:" "${WEB_CLIENT_URL}"
 echo ""
 
-if [ -n "${windows_dns_name}" ] && [ "${windows_dns_name}" != "None" ]; then
-  printf "NOTE: %-28s %s\n" "Windows instance:" "${windows_dns_name}"
+if [ -n "${windows_dns}" ] && [ "${windows_dns}" != "None" ]; then
+  printf "NOTE: %-28s %s\n" "Windows instance:" "${windows_dns}"
 else
   printf "WARN: %-28s %s\n" "Windows instance:" "not found or not running"
 fi
 
-if [ -n "${linux_dns_name}" ] && [ "${linux_dns_name}" != "None" ]; then
-  printf "NOTE: %-28s %s\n" "Linux instance:" "${linux_dns_name}"
+if [ -n "${linux_dns}" ] && [ "${linux_dns}" != "None" ]; then
+  printf "NOTE: %-28s %s\n" "Linux instance:" "${linux_dns}"
 else
   printf "WARN: %-28s %s\n" "Linux instance:" "not found or not running"
 fi
 
 echo ""
-

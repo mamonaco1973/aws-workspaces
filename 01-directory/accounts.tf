@@ -1,39 +1,31 @@
-# ================================================================================
-# Active Directory Administrator Credentials
-# --------------------------------------------------------------------------------
-# Generates a strong password for the AD Administrator account and stores the
-# credentials securely in AWS Secrets Manager.
-#
-# Key Points
-# - Passwords are randomly generated using the random_password provider.
-# - Credentials are stored as JSON in AWS Secrets Manager.
-# - Secret deletion is allowed for easy teardown of demo environments.
-# ================================================================================
+# ==============================================================================
+# Credentials — every password is generated here and kept only in Secrets
+# Manager; the instances read them at boot through their IAM role, and you
+# read them from the console to sign in. The _ws suffix keeps these apart
+# from the parent AD lab's secrets if both are deployed in one account.
+# ==============================================================================
 
 # ------------------------------------------------------------------------------
-# Generate random password for the AD Administrator
+# Directory Admin — also the WorkSpace's user
 # ------------------------------------------------------------------------------
+
+# Special characters limited to a set that survives the bash and PowerShell
+# user-data scripts without quoting trouble.
 resource "random_password" "admin_password" {
-  length           = 24     # Password length
-  special          = true   # Enable special characters
-  override_special = "!@#$%"# Restrict allowed special characters
+  length           = 24
+  special          = true
+  override_special = "!@#$%"
 }
 
-# ------------------------------------------------------------------------------
-# Secrets Manager secret for AD Administrator credentials
-# ------------------------------------------------------------------------------
 resource "aws_secretsmanager_secret" "admin_secret" {
-  name        = "admin_ad_credentials_ws"  # Secret name
-  description = "AD Admin Credentials"     # Secret description
+  name        = "admin_ad_credentials_ws"
+  description = "AD Admin Credentials"
 
   lifecycle {
-    prevent_destroy = false                # Allow secret deletion
+    prevent_destroy = false
   }
 }
 
-# ------------------------------------------------------------------------------
-# Store AD Administrator credentials in Secrets Manager
-# ------------------------------------------------------------------------------
 resource "aws_secretsmanager_secret_version" "admin_secret_version" {
   secret_id = aws_secretsmanager_secret.admin_secret.id
 
@@ -43,40 +35,17 @@ resource "aws_secretsmanager_secret_version" "admin_secret_version" {
   })
 }
 
-# ================================================================================
-# Active Directory Test Users
-# --------------------------------------------------------------------------------
-# Generates passwords and stores credentials for several demo AD users.
-#
-# Users
-# - John Smith
-# - Emily Davis
-# - Raj Patel
-# - Amit Kumar
-#
-# Each user receives:
-# - Random 24 character password
-# - Dedicated Secrets Manager secret
-# - JSON credential object (username/password)
-# ================================================================================
-
-
-# ================================================================================
-# User: John Smith
-# ================================================================================
-
 # ------------------------------------------------------------------------------
-# Generate password for John Smith
+# Demo users — created in AD by the Windows instance's user data
 # ------------------------------------------------------------------------------
+
+# John Smith
 resource "random_password" "jsmith_password" {
   length           = 24
   special          = true
   override_special = "!@#$%"
 }
 
-# ------------------------------------------------------------------------------
-# Secrets Manager secret for John Smith
-# ------------------------------------------------------------------------------
 resource "aws_secretsmanager_secret" "jsmith_secret" {
   name        = "jsmith_ad_credentials_ws"
   description = "John Smith AD Credentials"
@@ -86,9 +55,6 @@ resource "aws_secretsmanager_secret" "jsmith_secret" {
   }
 }
 
-# ------------------------------------------------------------------------------
-# Store John Smith credentials
-# ------------------------------------------------------------------------------
 resource "aws_secretsmanager_secret_version" "jsmith_secret_version" {
   secret_id = aws_secretsmanager_secret.jsmith_secret.id
 
@@ -98,23 +64,13 @@ resource "aws_secretsmanager_secret_version" "jsmith_secret_version" {
   })
 }
 
-
-# ================================================================================
-# User: Emily Davis
-# ================================================================================
-
-# ------------------------------------------------------------------------------
-# Generate password for Emily Davis
-# ------------------------------------------------------------------------------
+# Emily Davis
 resource "random_password" "edavis_password" {
   length           = 24
   special          = true
   override_special = "!@#$%"
 }
 
-# ------------------------------------------------------------------------------
-# Secrets Manager secret for Emily Davis
-# ------------------------------------------------------------------------------
 resource "aws_secretsmanager_secret" "edavis_secret" {
   name        = "edavis_ad_credentials_ws"
   description = "Emily Davis AD Credentials"
@@ -124,9 +80,6 @@ resource "aws_secretsmanager_secret" "edavis_secret" {
   }
 }
 
-# ------------------------------------------------------------------------------
-# Store Emily Davis credentials
-# ------------------------------------------------------------------------------
 resource "aws_secretsmanager_secret_version" "edavis_secret_version" {
   secret_id = aws_secretsmanager_secret.edavis_secret.id
 
@@ -136,23 +89,13 @@ resource "aws_secretsmanager_secret_version" "edavis_secret_version" {
   })
 }
 
-
-# ================================================================================
-# User: Raj Patel
-# ================================================================================
-
-# ------------------------------------------------------------------------------
-# Generate password for Raj Patel
-# ------------------------------------------------------------------------------
+# Raj Patel
 resource "random_password" "rpatel_password" {
   length           = 24
   special          = true
   override_special = "!@#$%"
 }
 
-# ------------------------------------------------------------------------------
-# Secrets Manager secret for Raj Patel
-# ------------------------------------------------------------------------------
 resource "aws_secretsmanager_secret" "rpatel_secret" {
   name        = "rpatel_ad_credentials_ws"
   description = "Raj Patel AD Credentials"
@@ -162,9 +105,6 @@ resource "aws_secretsmanager_secret" "rpatel_secret" {
   }
 }
 
-# ------------------------------------------------------------------------------
-# Store Raj Patel credentials
-# ------------------------------------------------------------------------------
 resource "aws_secretsmanager_secret_version" "rpatel_secret_version" {
   secret_id = aws_secretsmanager_secret.rpatel_secret.id
 
@@ -174,23 +114,13 @@ resource "aws_secretsmanager_secret_version" "rpatel_secret_version" {
   })
 }
 
-
-# ================================================================================
-# User: Amit Kumar
-# ================================================================================
-
-# ------------------------------------------------------------------------------
-# Generate password for Amit Kumar
-# ------------------------------------------------------------------------------
+# Amit Kumar
 resource "random_password" "akumar_password" {
   length           = 24
   special          = true
   override_special = "!@#$%"
 }
 
-# ------------------------------------------------------------------------------
-# Secrets Manager secret for Amit Kumar
-# ------------------------------------------------------------------------------
 resource "aws_secretsmanager_secret" "akumar_secret" {
   name        = "akumar_ad_credentials_ws"
   description = "Amit Kumar AD Credentials"
@@ -200,9 +130,6 @@ resource "aws_secretsmanager_secret" "akumar_secret" {
   }
 }
 
-# ------------------------------------------------------------------------------
-# Store Amit Kumar credentials
-# ------------------------------------------------------------------------------
 resource "aws_secretsmanager_secret_version" "akumar_secret_version" {
   secret_id = aws_secretsmanager_secret.akumar_secret.id
 

@@ -1,13 +1,8 @@
-# ================================================================================
-# AWS Provider Configuration
-# --------------------------------------------------------------------------------
-# Configures the AWS provider used by this Terraform project.
-#
-# Key Points
-# - Sets the default AWS region for all resources in this configuration.
-# - Resources will be deployed to us-east-1 unless overridden elsewhere.
-# ================================================================================
+# ==============================================================================
+# Provider — us-east-1, because WorkSpaces is not offered in us-east-2 where
+# the parent Active Directory lab runs
+# ==============================================================================
 
 provider "aws" {
-  region = "us-east-1"  # Default AWS region
+  region = "us-east-1"
 }

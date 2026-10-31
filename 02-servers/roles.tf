@@ -1,14 +1,7 @@
-# ================================================================================
-# Unique Deployment Identifier
-# --------------------------------------------------------------------------------
-# Generates a unique identifier used to prevent naming collisions across
-# multiple Terraform deployments.
-#
-# Key Points
-# - Generated once per Terraform state.
-# - Used as a suffix for IAM resource names.
-# - Ensures globally unique IAM names.
-# ================================================================================
+# ==============================================================================
+# Name suffix — IAM names are account-global, so a random suffix lets this lab
+# coexist with another copy of it (or the parent AD lab) in one account
+# ==============================================================================
 
 resource "random_id" "build_id" {
   byte_length = 3
@@ -18,12 +11,10 @@ locals {
   build_suffix = random_id.build_id.hex
 }
 
-
-# ================================================================================
-# EC2 Secrets Manager Access Role
-# --------------------------------------------------------------------------------a
-# Role assumed by EC2 instances that require access to AWS Secrets Manager.
-# ================================================================================
+# ==============================================================================
+# Instance role — lets the two servers read the join and user passwords at
+# boot instead of having them baked into user data
+# ==============================================================================
 
 resource "aws_iam_role" "ec2_secrets_role" {
   name = "tf-ec2-secrets-role-${local.build_suffix}"
@@ -40,12 +31,7 @@ resource "aws_iam_role" "ec2_secrets_role" {
   })
 }
 
-# ================================================================================
-# Secrets Manager Access Policy
-# --------------------------------------------------------------------------------
-# Grants EC2 instances permission to retrieve secrets from AWS Secrets Manager.
-# ================================================================================
-
+# Scoped to this lab's five secrets only.
 resource "aws_iam_policy" "secrets_policy" {
   name        = "tf-secrets-read-policy-${local.build_suffix}"
   description = "allow ec2 instances to read specific secrets"
@@ -84,39 +70,17 @@ resource "aws_iam_policy" "secrets_policy" {
   })
 }
 
-
-# ================================================================================
-# IAM Instance Profiles
-# --------------------------------------------------------------------------------
-# Instance profiles allow EC2 instances to assume IAM roles.
-# ================================================================================
-
 resource "aws_iam_instance_profile" "ec2_secrets_profile" {
   name = "tf-ec2-secrets-profile-${local.build_suffix}"
   role = aws_iam_role.ec2_secrets_role.name
 }
-
-# ================================================================================
-# Attach Secrets Manager Policy To EC2 Role
-# --------------------------------------------------------------------------------
-# Attaches the custom Secrets Manager read policy to the EC2 role.
-# ================================================================================
 
 resource "aws_iam_role_policy_attachment" "ec2_secrets_policy_attach" {
   role       = aws_iam_role.ec2_secrets_role.name
   policy_arn = aws_iam_policy.secrets_policy.arn
 }
 
-# ================================================================================
-# Attach AWS Systems Manager Policy
-# --------------------------------------------------------------------------------
-# Allows the EC2 instance to register with AWS Systems Manager (SSM) so it can
-# be managed using Session Manager, Run Command, and Patch Manager.
-#
-# Policy
-# - AmazonSSMManagedInstanceCore
-# ================================================================================
-
+# Session Manager as a fallback way in, since neither server has a public IP.
 resource "aws_iam_role_policy_attachment" "ec2_ssm_attach" {
   role       = aws_iam_role.ec2_secrets_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
