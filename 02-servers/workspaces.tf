@@ -1,29 +1,20 @@
-# -------------------------------
-# Input Variable: Directory ID
-# -------------------------------
-variable "directory_id" {
-  description = "The ID of the AWS Directory Service directory"  # Used to register an existing AWS Directory Service
-  type        = string
-}
+# ==============================================================================
+# Amazon WorkSpaces — register the managed directory with WorkSpaces and give
+# its Admin user a Windows desktop, the lab's only way into the private VPC
+# ==============================================================================
 
-# --------------------------------------------------
-# Data Source: Lookup Directory Object by Directory ID
-# --------------------------------------------------
 data "aws_directory_service_directory" "mcloud" {
-  directory_id = var.directory_id  # Pulls directory metadata based on provided ID
+  directory_id = var.directory_id
 }
 
-# ================================================================================
-# IAM Role for WorkSpaces Service
-# --------------------------------------------------------------------------------
-# Creates the IAM role required by AWS WorkSpaces. A unique suffix is appended
-# to the role name to avoid collisions across multiple deployments.
-# ================================================================================
+# ------------------------------------------------------------------------------
+# Service role — WorkSpaces acts on the VPC and directory through a role
+# with these two managed policies
+# ------------------------------------------------------------------------------
 
 resource "aws_iam_role" "workspaces_default" {
   name = "workspaces_DefaultRole_${local.build_suffix}"
 
-  # Trust policy: allows AWS WorkSpaces to assume this role
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
@@ -36,50 +27,48 @@ resource "aws_iam_role" "workspaces_default" {
   })
 }
 
-# -------------------------------------------------------------
-# IAM Role Policy Attachment: WorkSpaces Core Service Access
-# -------------------------------------------------------------
 resource "aws_iam_role_policy_attachment" "workspaces_service_access" {
-  role       = aws_iam_role.workspaces_default.name  # Attach to the IAM role defined above
-  policy_arn = "arn:aws:iam::aws:policy/AmazonWorkSpacesServiceAccess"  # Grants WorkSpaces service permissions
+  role       = aws_iam_role.workspaces_default.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonWorkSpacesServiceAccess"
 }
 
-# --------------------------------------------------------------
-# IAM Role Policy Attachment: WorkSpaces Self-Service Interface
-# --------------------------------------------------------------
+# Backs the self-service actions enabled on the directory below.
 resource "aws_iam_role_policy_attachment" "workspaces_self_service" {
   role       = aws_iam_role.workspaces_default.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonWorkSpacesSelfServiceAccess"  # Enables user-facing management tools
+  policy_arn = "arn:aws:iam::aws:policy/AmazonWorkSpacesSelfServiceAccess"
 }
 
-# -------------------------------------------------
-# Register Directory with the WorkSpaces Service
-# -------------------------------------------------
+# ------------------------------------------------------------------------------
+# Directory registration — produces the registration code users type into
+# the client. Self-service lets a user resize, rebuild or restart their own
+# WorkSpace from the client without an admin.
+# ------------------------------------------------------------------------------
+
 resource "aws_workspaces_directory" "registered_directory" {
-  directory_id = data.aws_directory_service_directory.mcloud.id  # Use existing directory lookup
+  directory_id = data.aws_directory_service_directory.mcloud.id
 
-  # Enable self-service features for users
   self_service_permissions {
-    change_compute_type  = true    # Allow changing instance type (e.g., performance)
-    increase_volume_size = true    # Allow increasing root/user disk sizes
-    rebuild_workspace    = true    # Allow full rebuild from bundle
-    restart_workspace    = true    # Allow restarting session
-    switch_running_mode  = true    # Allow switching between "AlwaysOn" and "AutoStop"
+    change_compute_type  = true
+    increase_volume_size = true
+    rebuild_workspace    = true
+    restart_workspace    = true
+    switch_running_mode  = true
   }
 
-  # Allow access from all major supported platforms
+  # Every client type, including the browser, so the demo works anywhere.
   workspace_access_properties {
-    device_type_android     = "ALLOW"
-    device_type_chromeos    = "ALLOW"
-    device_type_ios         = "ALLOW"
-    device_type_linux       = "ALLOW"
-    device_type_osx         = "ALLOW"
-    device_type_web         = "ALLOW"
-    device_type_windows     = "ALLOW"
-    device_type_zeroclient  = "ALLOW"
+    device_type_android    = "ALLOW"
+    device_type_chromeos   = "ALLOW"
+    device_type_ios        = "ALLOW"
+    device_type_linux      = "ALLOW"
+    device_type_osx        = "ALLOW"
+    device_type_web        = "ALLOW"
+    device_type_windows    = "ALLOW"
+    device_type_zeroclient = "ALLOW"
   }
 
-  # Enforce IAM dependencies before registering
+  # The role must exist with its policies before registration, and nothing
+  # else in this resource references it.
   depends_on = [
     aws_iam_role.workspaces_default,
     aws_iam_role_policy_attachment.workspaces_service_access,
@@ -87,49 +76,51 @@ resource "aws_workspaces_directory" "registered_directory" {
   ]
 }
 
-# ----------------------------------------------------
-# Data Source: Windows Standard WorkSpaces Bundle
-# ----------------------------------------------------
+# ------------------------------------------------------------------------------
+# Bundle — hard-coded Amazon-owned Windows bundle. If AWS retires it, find a
+# current one with: aws workspaces describe-workspace-bundles --owner AMAZON
+# ------------------------------------------------------------------------------
+
 data "aws_workspaces_bundle" "windows_standard_bundle" {
-  bundle_id = "wsb-fb2xfp6r8"  # Pre-defined Amazon bundle ID for Windows
+  bundle_id = "wsb-fb2xfp6r8"
 }
 
-# # ---------------------------------------------------
-# # Data Source: Red Hat Standard WorkSpaces Bundle
-# # ---------------------------------------------------
+# Optional Linux desktop for a second user; the bundle ID may be stale.
 # data "aws_workspaces_bundle" "redhat_standard_bundle" {
-#   bundle_id = "wsb-8wthbqzhx"  # Pre-defined Amazon bundle ID for Red Hat Linux
+#   bundle_id = "wsb-8wthbqzhx"
 # }
 
-# -------------------------------------------------------------
-# Create a WorkSpace for Admin user with Windows Bundle
-# -------------------------------------------------------------
-resource "aws_workspaces_workspace" "admin_workspace_win" {
-  directory_id = aws_workspaces_directory.registered_directory.directory_id  # Must reference the registered directory
-  user_name    = "Admin"  # Login name to associate with this workspace
-  bundle_id    = data.aws_workspaces_bundle.windows_standard_bundle.id  # Windows bundle for desktop
+# ------------------------------------------------------------------------------
+# Admin's WorkSpace — AUTO_STOP bills hourly and stops after an idle hour,
+# far cheaper than ALWAYS_ON for a lab that sits unused most of the time
+# ------------------------------------------------------------------------------
 
-  # Define compute/storage settings for the instance
-  workspace_properties {
-    compute_type_name                         = "VALUE"     # Mid-tier compute
-    root_volume_size_gib                      = 80          # Root disk size in GiB
-    user_volume_size_gib                      = 10          # User profile disk size in GiB
-    running_mode                              = "AUTO_STOP" # Save cost by stopping when idle
-    running_mode_auto_stop_timeout_in_minutes = 60          # Auto-stop after 60 minutes of inactivity
-  }
+# DISABLED to save cost while testing the rest of the build: everything up
+# to this point (directory, registration, servers, branding) still deploys.
+# Uncomment to create the WorkSpace again.
+#resource "aws_workspaces_workspace" "admin_workspace_win" {
+#  directory_id = aws_workspaces_directory.registered_directory.directory_id
+#  user_name    = "Admin"
+#  bundle_id    = data.aws_workspaces_bundle.windows_standard_bundle.id
+#
+#  workspace_properties {
+#    compute_type_name                         = "VALUE"
+#    root_volume_size_gib                      = 80
+#    user_volume_size_gib                      = 10
+#    running_mode                              = "AUTO_STOP"
+#    running_mode_auto_stop_timeout_in_minutes = 60
+#  }
+#
+#  tags = {
+#    Name = "Admin WorkSpace"
+#  }
+#
+#  depends_on = [
+#    aws_workspaces_directory.registered_directory
+#  ]
+#}
 
-  tags = {
-    Name = "Admin WorkSpace"  # Tag used for management visibility
-  }
-
-  depends_on = [
-    aws_workspaces_directory.registered_directory  # Ensure directory is registered before provisioning workspace
-  ]
-}
-
-# ----------------------------------------------------------------
-# (Optional) Create a WorkSpace for rpatel user using Red Hat OS
-# ----------------------------------------------------------------
+# Optional: a Red Hat WorkSpace for rpatel. Uncomment with the bundle above.
 #resource "aws_workspaces_workspace" "rpatel_workspace_redhat" {
 #  directory_id = aws_workspaces_directory.registered_directory.directory_id
 #  user_name    = "rpatel"
@@ -148,6 +139,6 @@ resource "aws_workspaces_workspace" "admin_workspace_win" {
 #  }
 #
 #  depends_on = [
-#    aws_workspaces_workspace.admin_workspace_win  # Create after Admin workspace, for dependency control
+#    aws_workspaces_workspace.admin_workspace_win
 #  ]
 #}
