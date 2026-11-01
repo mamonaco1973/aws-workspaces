@@ -1,8 +1,8 @@
-# Amazon WorkSpaces with AWS Managed Microsoft AD
+# Amazon WorkSpaces
 
 A follow-up to the [AWS Directory Service](https://github.com/mamonaco1973/aws-active-directory)
-lab ([video](https://youtu.be/1lnSxfFmGPY)). The same **AWS Managed
-Microsoft AD** domain, `mcloud.mikecloud.com`, is registered with **Amazon
+lab ([video](https://youtu.be/1lnSxfFmGPY)). The same **AWS Directory
+Service** domain, `mcloud.mikecloud.com`, is registered with **Amazon
 WorkSpaces**, and a Windows WorkSpace is provisioned for the domain's
 `Admin` user. The Linux and Windows domain members move to **private
 subnets** with no public IPs, so the WorkSpace is the way in: a cloud
@@ -15,7 +15,7 @@ us-east-2 (see [WorkSpaces availability zones](https://docs.aws.amazon.com/works
 
 | Piece | Where | Role |
 |---|---|---|
-| **mcloud.mikecloud.com** | AWS Managed Microsoft AD, Standard | NetBIOS `MCLOUD`; two DCs in `ad-ws-private-subnet-1` and `-2` (`use1-az6`, `use1-az4`); the VPC's DHCP options point DNS at them |
+| **mcloud.mikecloud.com** | AWS Directory Service, Standard | NetBIOS `MCLOUD`; two DCs in `ad-ws-private-subnet-1` and `-2` (`use1-az6`, `use1-az4`); the VPC's DHCP options point DNS at them |
 | **WorkSpaces directory** | us-east-1 | the domain registered with WorkSpaces; every client type allowed; self-service for compute type, volume size, rebuild, restart and running mode |
 | **Admin WorkSpace** | WorkSpaces | Windows Server 2025 WSP bundle `wsb-82dpmqfgh`, `STANDARD` compute, 80 GiB root and 50 GiB user volumes, `AUTO_STOP` after 60 minutes |
 | **linux-ad-instance** | `ad-ws-private-subnet-1` | Ubuntu 24.04, `t2.micro`; joins the domain with realm and SSSD; `linux-admins` get sudo |
@@ -28,13 +28,13 @@ us-east-2 (see [WorkSpaces availability zones](https://docs.aws.amazon.com/works
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="architecture-dark.svg">
-  <img alt="A WorkSpaces client signs in with the directory's registration code to the Admin WorkSpace, a Windows desktop in us-east-1 registered with AWS Managed Microsoft AD for mcloud.mikecloud.com. The WorkSpace acts as a jump box: from it, the Admin user SSHes to linux-ad-instance and RDPs to windows-ad-instance, both in private subnets with no public IPs. Each instance reads the AD admin password from Secrets Manager at boot and joins the domain, the Linux one with realm and SSSD; the Windows one also creates the lab's groups and users. A NAT gateway gives the private subnets outbound access." src="architecture-light.svg">
+  <img alt="A WorkSpaces client signs in with the directory's registration code to the Admin WorkSpace, a Windows desktop in us-east-1 registered with AWS Directory Service for mcloud.mikecloud.com. The WorkSpace acts as a jump box: from it, the Admin user SSHes to linux-ad-instance and RDPs to windows-ad-instance, both in private subnets with no public IPs. Each instance reads the AD admin password from Secrets Manager at boot and joins the domain, the Linux one with realm and SSSD; the Windows one also creates the lab's groups and users. A NAT gateway gives the private subnets outbound access." src="architecture-light.svg">
 </picture>
 
 Regenerate with `python3 make_diagram.py`.
 
 - **`01-directory/`**: the VPC, subnets, NAT gateway and DHCP options, the
-  passwords in Secrets Manager, and the managed directory.
+  passwords in Secrets Manager, and the directory.
 - **`02-servers/`**: the two instances and their user data, their IAM role
   and security groups, and `workspaces.tf` (the WorkSpaces role, the
   directory registration and the Admin WorkSpace).
@@ -97,7 +97,7 @@ cd aws-workspaces
 
 `apply.sh` runs `check_env.sh`, then:
 
-1. Applies **`01-directory`**: the network, the secrets and the managed
+1. Applies **`01-directory`**: the network, the secrets and the
    directory. The directory takes **30 to 60 minutes**.
 2. Looks up the directory ID and applies **`02-servers`** with it: the two
    instances, which join the domain from their user data, the WorkSpaces
@@ -108,14 +108,20 @@ It ends by running `validate.sh`:
 
 ```
 ============================================================================
-WorkSpaces Quick Start - Validation Output
+WorkSpaces - Validation Output
 ============================================================================
 
 NOTE: WorkSpaces Registration Code: SLiad+XXXXXX
 NOTE: WorkSpaces URL:               https://us-east-1.webclient.amazonworkspaces.com/login
 
-NOTE: Windows instance:             ip-10-0-0-200.ec2.internal
-NOTE: Linux instance:               ip-10-0-0-150.ec2.internal
+NOTE: Admin user (WorkSpace):       MCLOUD\Admin
+NOTE: Admin password:               ************************
+
+NOTE: Test user:                    MCLOUD\jsmith
+NOTE: Test user password:           ************************
+
+NOTE: Windows instance:             ip-10-0-0-248.ec2.internal
+NOTE: Linux instance:               ip-10-0-0-175.ec2.internal
 ```
 
 The directory in the console:
@@ -136,7 +142,8 @@ and the two private instances:
 
    ![WorkSpaces client with custom branding](workspaces1.png)
 
-3. Sign in as `Admin` and connect to the Windows WorkSpace.
+3. Sign in as just `Admin` (not `MCLOUD\Admin`) and connect to the Windows
+   WorkSpace.
 4. From the WorkSpace, RDP to the **Windows instance** or SSH to the
    **Linux instance** by the private names `validate.sh` printed, as `Admin`
    or one of the users above (passwords in their `*_ad_credentials_ws`
@@ -159,7 +166,7 @@ five secrets without a recovery window, then destroys `01-directory`.
 - The Linux instance has SSH password authentication turned on so AD users
   can sign in with their passwords.
 - WorkSpaces bills per WorkSpace even in `AUTO_STOP` mode (a monthly
-  storage fee plus hourly use), and the managed directory bills by the
+  storage fee plus hourly use), and AWS Directory Service bills by the
   hour, so tear the lab down when you're done.
 - The bundle ID is hard-coded; if AWS retires `wsb-82dpmqfgh`, look up a
   current Windows bundle with `aws workspaces describe-workspace-bundles

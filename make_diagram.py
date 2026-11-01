@@ -121,7 +121,7 @@ NODES.update({
                  "Windows bundle, STANDARD, AUTO_STOP"),
     "windows":  (COL[2], ROW[1], "blue", "monitor", "windows-ad-instance",
                  "t2.medium, private, creates users"),
-    "dc":       (COL[1], ROW[2], "purple", "users", "Managed Microsoft AD",
+    "dc":       (COL[1], ROW[2], "purple", "users", "AWS Directory Service",
                  "mcloud.mikecloud.com, registered"),
     "secrets":  (COL[1], ROW[3], "store", "key", "Secrets Manager",
                  "admin + user passwords"),
@@ -153,8 +153,8 @@ EDGES = {
 }
 
 ALT = ("A WorkSpaces client signs in with the directory's registration code to the "
-       "Admin WorkSpace, a Windows desktop in us-east-1 registered with AWS Managed "
-       "Microsoft AD for mcloud.mikecloud.com. The WorkSpace acts as a jump box: from "
+       "Admin WorkSpace, a Windows desktop in us-east-1 registered with AWS Directory "
+       "Service for mcloud.mikecloud.com. The WorkSpace acts as a jump box: from "
        "it, the Admin user SSHes to linux-ad-instance and RDPs to windows-ad-instance, "
        "both in private subnets with no public IPs. Each instance reads the AD admin "
        "password from Secrets Manager at boot and joins the domain, the Linux one with "
