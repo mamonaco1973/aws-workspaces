@@ -120,8 +120,8 @@ NOTE: Admin password:               ************************
 NOTE: Test user:                    MCLOUD\jsmith
 NOTE: Test user password:           ************************
 
-NOTE: Windows instance:             ip-10-0-0-248.ec2.internal
-NOTE: Linux instance:               ip-10-0-0-175.ec2.internal
+NOTE: Windows instance:             10.0.0.248
+NOTE: Linux instance:               10.0.0.175
 ```
 
 The directory in the console:
@@ -145,7 +145,7 @@ and the two private instances:
 3. Sign in as just `Admin` (not `MCLOUD\Admin`) and connect to the Windows
    WorkSpace.
 4. From the WorkSpace, RDP to the **Windows instance** or SSH to the
-   **Linux instance** by the private names `validate.sh` printed, as `Admin`
+   **Linux instance** by the private IPs `validate.sh` printed, as `Admin`
    or one of the users above (passwords in their `*_ad_credentials_ws`
    secrets).
 
