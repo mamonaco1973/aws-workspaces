@@ -10,7 +10,7 @@ set -euo pipefail
 
 echo "NOTE: Validating required commands in PATH."
 
-for cmd in aws terraform; do
+for cmd in aws terraform jq; do
   if ! command -v "${cmd}" >/dev/null 2>&1; then
     echo "ERROR: Required command not found: ${cmd}"
     exit 1

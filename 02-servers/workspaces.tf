@@ -77,12 +77,15 @@ resource "aws_workspaces_directory" "registered_directory" {
 }
 
 # ------------------------------------------------------------------------------
-# Bundle — hard-coded Amazon-owned Windows bundle. If AWS retires it, find a
-# current one with: aws workspaces describe-workspace-bundles --owner AMAZON
+# Bundle — hard-coded Amazon-owned Windows bundle: Standard with Windows
+# (Server 2025 based), WorkSpaces Streaming Protocol (WSP). Amazon offers no
+# Value-size bundle on Server 2022 or later, so the WorkSpace is STANDARD.
+# If AWS retires it, find a current one with:
+#   aws workspaces describe-workspace-bundles --owner AMAZON
 # ------------------------------------------------------------------------------
 
 data "aws_workspaces_bundle" "windows_standard_bundle" {
-  bundle_id = "wsb-fb2xfp6r8"
+  bundle_id = "wsb-82dpmqfgh"
 }
 
 # Optional Linux desktop for a second user; the bundle ID may be stale.
@@ -95,30 +98,27 @@ data "aws_workspaces_bundle" "windows_standard_bundle" {
 # far cheaper than ALWAYS_ON for a lab that sits unused most of the time
 # ------------------------------------------------------------------------------
 
-# DISABLED to save cost while testing the rest of the build: everything up
-# to this point (directory, registration, servers, branding) still deploys.
-# Uncomment to create the WorkSpace again.
-#resource "aws_workspaces_workspace" "admin_workspace_win" {
-#  directory_id = aws_workspaces_directory.registered_directory.directory_id
-#  user_name    = "Admin"
-#  bundle_id    = data.aws_workspaces_bundle.windows_standard_bundle.id
-#
-#  workspace_properties {
-#    compute_type_name                         = "VALUE"
-#    root_volume_size_gib                      = 80
-#    user_volume_size_gib                      = 10
-#    running_mode                              = "AUTO_STOP"
-#    running_mode_auto_stop_timeout_in_minutes = 60
-#  }
-#
-#  tags = {
-#    Name = "Admin WorkSpace"
-#  }
-#
-#  depends_on = [
-#    aws_workspaces_directory.registered_directory
-#  ]
-#}
+resource "aws_workspaces_workspace" "admin_workspace_win" {
+  directory_id = aws_workspaces_directory.registered_directory.directory_id
+  user_name    = "Admin"
+  bundle_id    = data.aws_workspaces_bundle.windows_standard_bundle.id
+
+  workspace_properties {
+    compute_type_name                         = "STANDARD"
+    root_volume_size_gib                      = 80
+    user_volume_size_gib                      = 50
+    running_mode                              = "AUTO_STOP"
+    running_mode_auto_stop_timeout_in_minutes = 60
+  }
+
+  tags = {
+    Name = "Admin WorkSpace"
+  }
+
+  depends_on = [
+    aws_workspaces_directory.registered_directory
+  ]
+}
 
 # Optional: a Red Hat WorkSpace for rpatel. Uncomment with the bundle above.
 #resource "aws_workspaces_workspace" "rpatel_workspace_redhat" {

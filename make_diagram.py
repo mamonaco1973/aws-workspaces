@@ -118,7 +118,7 @@ NODES.update({
     "linux":    (COL[0], ROW[1], "blue", "terminal", "linux-ad-instance",
                  "Ubuntu 24.04, t2.micro, private"),
     "ws":       (COL[1], ROW[1], "amber", "monitor", "Admin WorkSpace",
-                 "Windows bundle, VALUE, AUTO_STOP"),
+                 "Windows bundle, STANDARD, AUTO_STOP"),
     "windows":  (COL[2], ROW[1], "blue", "monitor", "windows-ad-instance",
                  "t2.medium, private, creates users"),
     "dc":       (COL[1], ROW[2], "purple", "users", "Managed Microsoft AD",

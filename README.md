@@ -17,7 +17,7 @@ us-east-2 (see [WorkSpaces availability zones](https://docs.aws.amazon.com/works
 |---|---|---|
 | **mcloud.mikecloud.com** | AWS Managed Microsoft AD, Standard | NetBIOS `MCLOUD`; two DCs in `ad-ws-private-subnet-1` and `-2` (`use1-az6`, `use1-az4`); the VPC's DHCP options point DNS at them |
 | **WorkSpaces directory** | us-east-1 | the domain registered with WorkSpaces; every client type allowed; self-service for compute type, volume size, rebuild, restart and running mode |
-| **Admin WorkSpace** | WorkSpaces | Windows bundle `wsb-fb2xfp6r8`, `VALUE` compute, 80 GiB root and 10 GiB user volumes, `AUTO_STOP` after 60 minutes |
+| **Admin WorkSpace** | WorkSpaces | Windows Server 2025 WSP bundle `wsb-82dpmqfgh`, `STANDARD` compute, 80 GiB root and 50 GiB user volumes, `AUTO_STOP` after 60 minutes |
 | **linux-ad-instance** | `ad-ws-private-subnet-1` | Ubuntu 24.04, `t2.micro`; joins the domain with realm and SSSD; `linux-admins` get sudo |
 | **windows-ad-instance** | `ad-ws-private-subnet-2` | Windows Server 2022, `t2.medium`; joins the domain, installs RSAT, and creates the lab's groups and users |
 | **Secrets Manager** | us-east-1 | `admin_ad_credentials_ws` and one `*_ad_credentials_ws` secret per user |
@@ -72,8 +72,10 @@ The Windows instance creates these at boot. Every user's primary
 | us | 10003 |
 | linux-admins | 10004 |
 
-The WorkSpace belongs to the directory's built-in `Admin` account, whose
-password is in `admin_ad_credentials_ws`.
+The users' passwords are memorable, `<word>-<6 digits>` (for example
+`orange-123456`), each in its `<user>_ad_credentials_ws` secret. The
+WorkSpace belongs to the directory's built-in `Admin` account, whose
+password is a random 24-character string in `admin_ad_credentials_ws`.
 
 ## Prerequisites
 
@@ -126,7 +128,8 @@ and the two private instances:
 
 ## Try it
 
-1. Get the `Admin` password from the `admin_ad_credentials_ws` secret.
+1. Get the `Admin` password: `validate.sh` prints it, along with
+   `jsmith`'s, and it is in the `admin_ad_credentials_ws` secret.
 2. Open the WorkSpaces client (or the web client URL above) and enter the
    **registration code**. The branding from `brand.sh` shows on the sign-in
    screen:
@@ -158,6 +161,6 @@ five secrets without a recovery window, then destroys `01-directory`.
 - WorkSpaces bills per WorkSpace even in `AUTO_STOP` mode (a monthly
   storage fee plus hourly use), and the managed directory bills by the
   hour, so tear the lab down when you're done.
-- The bundle ID is hard-coded; if AWS retires `wsb-fb2xfp6r8`, look up a
+- The bundle ID is hard-coded; if AWS retires `wsb-82dpmqfgh`, look up a
   current Windows bundle with `aws workspaces describe-workspace-bundles
   --owner AMAZON`.

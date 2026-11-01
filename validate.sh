@@ -23,12 +23,23 @@ get_private_dns_by_name_tag() {
 regcode=$(aws workspaces describe-workspace-directories \
   --query "Directories[?DirectoryName=='${DIRECTORY_NAME}'].RegistrationCode" \
   --output text)
+get_secret() {
+  aws secretsmanager get-secret-value --secret-id "$1" \
+    --query SecretString --output text
+}
+
+admin=$(get_secret admin_ad_credentials_ws)
+admin_user=$(echo "${admin}" | jq -r .username)
+admin_password=$(echo "${admin}" | jq -r .password)
+jsmith=$(get_secret jsmith_ad_credentials_ws)
+jsmith_user=$(echo "${jsmith}" | jq -r .username)
+jsmith_password=$(echo "${jsmith}" | jq -r .password)
 windows_dns=$(get_private_dns_by_name_tag "windows-ad-instance")
 linux_dns=$(get_private_dns_by_name_tag "linux-ad-instance")
 
 echo ""
 echo "============================================================================"
-echo "WorkSpaces Quick Start - Validation Output"
+echo "WorkSpaces - Validation Output"
 echo "============================================================================"
 echo ""
 
@@ -37,6 +48,12 @@ if [ -n "${regcode}" ] && [ "${regcode}" != "None" ]; then
 fi
 
 printf "NOTE: %-28s %s\n" "WorkSpaces URL:" "${WEB_CLIENT_URL}"
+echo ""
+printf "NOTE: %-28s %s\n" "Admin user (WorkSpace):" "${admin_user}"
+printf "NOTE: %-28s %s\n" "Admin password:" "${admin_password}"
+echo ""
+printf "NOTE: %-28s %s\n" "Test user:" "${jsmith_user}"
+printf "NOTE: %-28s %s\n" "Test user password:" "${jsmith_password}"
 echo ""
 
 if [ -n "${windows_dns}" ] && [ "${windows_dns}" != "None" ]; then
